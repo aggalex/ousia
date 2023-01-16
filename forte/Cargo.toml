@@ -1,0 +1,27 @@
+[package]
+name = "forte"
+version = "0.1.0"
+edition = "2021"
+license = "LGPL-3.0-only"
+categories = ["gui"]
+keywords = ["gtk"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+gtkrs = { version = "0.5.5", package = "gtk4" }
+
+[build-dependencies]
+generation = { path = "../generation" }
+
+[features]
+v4_2 = ["gtkrs/v4_2"]
+v4_4 = ["v4_2", "gtkrs/v4_4"]
+v4_6 = ["v4_4", "gtkrs/v4_6"]
+v4_8 = ["v4_6", "gtkrs/v4_8"]
+v4_10 = ["v4_8", "gtkrs/v4_10"]
+
+[[test]]
+harness = false # This is the important line!
+path = "tests/counter.rs"
+name = "counter"

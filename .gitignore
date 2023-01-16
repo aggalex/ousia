@@ -1,0 +1,5 @@
+/target
+/generation/target
+/generation/gtk4-rs
+/prelude/target
+**/Cargo.lock
