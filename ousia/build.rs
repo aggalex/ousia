@@ -8,7 +8,7 @@ fn main() {
         target: PathBuf::from("src/ousia"),
         source_crate: PathBuf::from(option_env!("SOURCE_CRATE")
             .unwrap_or("../generation/gtk4-rs/gtk4")),
-        included: Some(vec!["application.rs", "application_window.rs", "box_.rs", "button.rs", "label.rs"]),
+        // included: Some(vec!["application.rs", "application_window.rs", "box_.rs", "button.rs", "label.rs"]),
         ..Default::default()
     }
         .generate()

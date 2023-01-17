@@ -1,12 +1,14 @@
 use quote::__private::TokenStream;
 use quote::{format_ident, quote};
-use syn::{GenericParam, Ident, ImplItemMethod, PathArguments, Type, TypeParamBound};
+use syn::{Attribute, GenericParam, Ident, ImplItemMethod, PathArguments, ReturnType, Type, TypeParamBound};
 use syn::spanned::Spanned;
 
 #[derive(Debug)]
 pub struct Signal {
     pub name: String,
     pub args: Vec<Type>,
+    pub ret: ReturnType,
+    pub attrs: Vec<Attribute>
 }
 
 impl Signal {
@@ -15,9 +17,12 @@ impl Signal {
         let name = format_ident!("{}", self.name);
         let ty = &self.args;
         let connector = format_ident!("connect_{}", name);
+        let ret = &self.ret;
+        let attrs = &self.attrs;
 
         quote! {
-            pub fn #name(&mut self, f: impl Fn(&#obj, #(#ty),*) + 'static) -> &mut #builder {
+            #( #attrs )*
+            pub fn #name(&mut self, f: impl Fn(&#obj, #(#ty),*) #ret + 'static) -> &mut #builder {
                 self.builder.on_build(move |obj| { obj.#connector(f); });
                 &mut self.builder
             }
@@ -40,7 +45,7 @@ impl TryFrom<&ImplItemMethod> for Signal {
 
         let inputs_span = item.sig.inputs.span();
 
-        let args = item.sig.generics.params.iter()
+        let ang = item.sig.generics.params.iter()
             .filter_map(|arg| match arg {
                 GenericParam::Type(ty) => Some(&ty.bounds),
                 _ => None
@@ -61,19 +66,27 @@ impl TryFrom<&ImplItemMethod> for Signal {
                 .next()
             )
             .filter_map(|tr| match &tr.path.segments.last().as_ref()?.arguments {
-                PathArguments::Parenthesized(ang) => Some(&ang.inputs),
+                PathArguments::Parenthesized(ang) => Some(ang),
                 _ => None
             })
             .next()
-            .ok_or_else(|| syn::Error::new(inputs_span, "Unable to find closure argument"))?
+            .ok_or_else(|| syn::Error::new(inputs_span, "Unable to find closure argument"))?;
+
+        let args = ang.inputs
             .iter()
             .skip(1)
             .cloned()
             .collect();
 
+        let ret = ang.output.clone();
+
+        let attrs = item.attrs.clone();
+
         Ok(Signal {
             name,
             args,
+            ret,
+            attrs
         })
     }
 }

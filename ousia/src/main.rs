@@ -1,6 +1,6 @@
 use gtkrs::prelude::*;
-use ::forte::prelude::*;
-use ::forte::*;
+use ::ousia::prelude::*;
+use ::ousia::*;
 use gtkrs::{glib, Widget};
 
 fn main() {

@@ -184,7 +184,7 @@ impl ToTokens for Class {
             #![allow(dead_code, unused_imports)]
 
             #( #uses )*
-            use gtkrs::{ *, #name, prelude::* };
+            use gtkrs::{ *, #name, prelude::*, traits::* };
             use crate::prelude::*;
 
             #[derive(Default)]
@@ -258,7 +258,7 @@ impl ToTokens for Class {
             #[macro_export]
             macro_rules! #name {
                 { $($rest:tt)* } => {
-                    ousia! { (gtkrs::#name::forte()) $($rest)* }
+                    ousia! { (gtkrs::#name::ousia()) $($rest)* }
                 }
             }
         };
