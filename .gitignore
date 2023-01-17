@@ -1,5 +1,6 @@
 /target
 /generation/target
 /generation/gtk4-rs
+/ousia/src/ousia
 /prelude/target
 **/Cargo.lock
