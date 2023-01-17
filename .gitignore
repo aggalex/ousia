@@ -4,3 +4,4 @@
 /ousia/src/ousia
 /prelude/target
 **/Cargo.lock
+/ousia/src/ousia/

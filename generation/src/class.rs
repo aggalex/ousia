@@ -258,7 +258,7 @@ impl ToTokens for Class {
             #[macro_export]
             macro_rules! #name {
                 { $($rest:tt)* } => {
-                    forte! { (gtkrs::#name::forte()) $($rest)* }
+                    ousia! { (gtkrs::#name::forte()) $($rest)* }
                 }
             }
         };

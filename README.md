@@ -1,17 +1,17 @@
-# Forte
+# Ousia
 
 #### Write declarative UIs in Gtk4 and Rust
 
-Forte provides an easy way to write UIs in Rust without the hussle of creating 
+Ousia provides an easy way to write UIs in Rust without the hussle of creating 
 GObject classes and tracking variables all around.
 
-## <p style="color: red">IN ALPHA</p>
+## IN ALPHA
 
 This crate is not ready for release yet.
 
 ## Choose your style: macro or builder
 
-Forte provides two choices for building UIs: either use the macros which will 
+Ousia provides two choices for building UIs: either use the macros which will 
 build everything for you in a sleek struct-like syntax, or the builders which
 do not require any macro invocation and thus might play a bit nicer with code
 intelligence. 
@@ -65,12 +65,12 @@ fn build_ui_with_macros(app: &gtkrs::Application) {
 
 Builders form the backbone of the crate. They are automatically generated based on
 the [gtk4-rs](https://github.com/gtk-rs/gtk4-rs) crate itself, which is a dependency
-to this crate, and make use of its own builders on their implementations. Forte builders
+to this crate, and make use of its own builders on their implementations. ousia builders
 provide a few extra features on top of [gtk4-rs](https://github.com/gtk-rs/gtk4-rs)'s
-builders, namely in supporting Forte's Rx-like reactivity structs, and also signals.
+builders, namely in supporting ousia's Rx-like reactivity structs, and also signals.
 
 #### Features:
-- Get a forte builder using the `::forte()` method on your desired gtk4-rs widget
+- Get a ousia builder using the `::ousia()` method on your desired gtk4-rs widget
 - initialize a property using the corresponding method, like `.property_name(value)`
 - track a property using the `.bind()` builder provider and a reactive monad as value:
 `.bind().property_name(reactive)`
@@ -81,18 +81,18 @@ and a `'static` closure as value: `.connect().signal_name(move |_| do_something(
 fn build_ui_with_builders(app: &gtkrs::Application) {
     let state = Reactive::new(0);
 
-    let window = gtkrs::ApplicationWindow::forte()
+    let window = gtkrs::ApplicationWindow::ousia()
         .application(app)
         .default_width(200)
         .default_height(200)
-        .child( &gtkrs::Box::forte()
+        .child( &gtkrs::Box::ousia()
             .orientation(gtkrs::Orientation::Vertical)
             .margin_start(12)
             .margin_end(12)
             .margin_top(12)
             .margin_bottom(12)
             .spacing(6)
-            .append( &gtkrs::Label::forte()
+            .append( &gtkrs::Label::ousia()
                 .vexpand(true)
                 .bind().label(&state.map(ToString::to_string))
                 .create()

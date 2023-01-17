@@ -5,9 +5,10 @@
       <sourceFolder url="file://$MODULE_DIR$/generation/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/prelude/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/forte/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/generation_gir/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/forte/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/ousia/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ousia/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/ousia_macros/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/prelude/target" />
     </content>
