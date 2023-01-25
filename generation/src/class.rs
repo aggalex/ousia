@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use quote::__private::{TokenStream, TokenTree};
 use quote::{format_ident, quote, ToTokens};
-use syn::{Attribute, File, ImplItem, Item, ItemUse, Type, UseTree};
+use syn::{Attribute, File, GenericArgument, ImplItem, Item, ItemUse, PathArguments, Type, UseTree};
 use syn::spanned::Spanned;
 use crate::prop::Property;
 use crate::signal::Signal;
@@ -50,7 +50,8 @@ pub struct Class {
     pub name: String,
     pub setters: HashMap<String, Property>,
     pub used: Vec<GtkImport>,
-    pub signals: HashMap<String, Signal>
+    pub signals: HashMap<String, Signal>,
+    pub isWidget: bool,
 }
 
 impl TryFrom<File> for Class {
@@ -58,6 +59,7 @@ impl TryFrom<File> for Class {
 
     fn try_from(file: File) -> Result<Class, syn::Error> {
         let mut last_token: String = "".to_string();
+
         let mac = file.items.iter()
             .filter_map(|item| match item {
                 Item::Macro(mac) => Some(mac),
@@ -79,12 +81,27 @@ impl TryFrom<File> for Class {
                 _ => None
             });
 
+        // automata to find name of struct
         let name = loop {
             let token = iter.next().ok_or(syn::Error::new(mac.span(), "no struct declaration found in glib::wrapper!"))?;
             last_token = match (&*last_token, &*token) {
                 (_, "pub") => token,
                 ("pub", "struct") => token,
                 ("struct", _) => break token,
+                _ => "".to_string()
+            }
+        };
+
+        // automata to find if it extends widget
+        let isWidget = loop {
+            let token = match iter.next() {
+                Some(tk) => tk,
+                None => break false,
+            };
+            last_token = match (&*last_token, &*token) {
+                (_, "@") => token,
+                ("@", "extends") => token,
+                ("extends", "Widget") => break true,
                 _ => "".to_string()
             }
         };
@@ -150,7 +167,8 @@ impl TryFrom<File> for Class {
             name,
             used,
             setters,
-            signals
+            signals,
+            isWidget
         })
     }
 }
@@ -180,12 +198,18 @@ impl ToTokens for Class {
             ))
             .collect::<Vec<_>>();
 
+        let cleanup = match self.isWidget {
+            true => quote!( self.connect_destroy(f); ),
+            false => quote!()
+        };
+
         *tokens = quote! {
             #![allow(dead_code, unused_imports)]
 
             #( #uses )*
             use gtkrs::{ *, #name, prelude::*, traits::* };
             use crate::prelude::*;
+            use rxrust::prelude::*;
 
             #[derive(Default)]
             pub struct #builder_name {
@@ -253,6 +277,12 @@ impl ToTokens for Class {
 
             impl ForteExt for #name {
                 type Builder = #builder_name;
+            }
+
+            impl Cleanup for #name {
+                fn cleanup(&self, f: impl FnMut() + 'static) {
+                    #cleanup
+                }
             }
 
             #[macro_export]

@@ -8,7 +8,8 @@ pub struct Signal {
     pub name: String,
     pub args: Vec<Type>,
     pub ret: ReturnType,
-    pub attrs: Vec<Attribute>
+    pub attrs: Vec<Attribute>,
+    pub fn_bound: String,
 }
 
 impl Signal {
@@ -19,10 +20,11 @@ impl Signal {
         let connector = format_ident!("connect_{}", name);
         let ret = &self.ret;
         let attrs = &self.attrs;
+        let fn_bound = format_ident!("{}", self.fn_bound);
 
         quote! {
             #( #attrs )*
-            pub fn #name(&mut self, f: impl Fn(&#obj, #(#ty),*) #ret + 'static) -> &mut #builder {
+            pub fn #name(&mut self, f: impl #fn_bound(&#obj, #(#ty),*) #ret + 'static) -> &mut #builder {
                 self.builder.on_build(move |obj| { obj.#connector(f); });
                 &mut self.builder
             }
@@ -45,7 +47,7 @@ impl TryFrom<&ImplItemMethod> for Signal {
 
         let inputs_span = item.sig.inputs.span();
 
-        let ang = item.sig.generics.params.iter()
+        let (fn_bound, ang) = item.sig.generics.params.iter()
             .filter_map(|arg| match arg {
                 GenericParam::Type(ty) => Some(&ty.bounds),
                 _ => None
@@ -56,17 +58,18 @@ impl TryFrom<&ImplItemMethod> for Signal {
                     _ => None
                 })
                 .filter_map(|bound| {
-                    if bound.path.segments.last()?
-                        .ident.to_string().starts_with("Fn") {
-                        Some(bound)
+                    let fn_bound = bound.path.segments.last()?
+                        .ident.to_string();
+                    if fn_bound.starts_with("Fn") {
+                        Some((fn_bound, bound))
                     } else {
                         None
                     }
                 })
                 .next()
             )
-            .filter_map(|tr| match &tr.path.segments.last().as_ref()?.arguments {
-                PathArguments::Parenthesized(ang) => Some(ang),
+            .filter_map(|(fn_bound, tr)| match &tr.path.segments.last().as_ref()?.arguments {
+                PathArguments::Parenthesized(ang) => Some((fn_bound, ang)),
                 _ => None
             })
             .next()
@@ -86,7 +89,8 @@ impl TryFrom<&ImplItemMethod> for Signal {
             name,
             args,
             ret,
-            attrs
+            attrs,
+            fn_bound
         })
     }
 }
