@@ -10,6 +10,7 @@ keywords = ["gtk"]
 
 [dependencies]
 gtkrs = { version = "0.5.5", package = "gtk4" }
+rxrust = { git = "https://github.com/aggalex/rxRust/", branch = "behavior_trait" }
 
 [build-dependencies]
 generation = { path = "../generation" }

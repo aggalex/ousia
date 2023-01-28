@@ -1,4 +1,6 @@
 #![feature(anonymous_lifetime_in_impl_trait)]
+#![feature(unboxed_closures)]
+#![feature(fn_traits)]
 
 extern crate gtkrs;
 

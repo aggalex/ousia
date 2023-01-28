@@ -30,7 +30,7 @@ that error messages are as simple and understandable as possible.
 
 ```rust
 fn build_ui_with_macros(app: &gtkrs::Application) {
-    let state = Reactive::new(0);
+    let state = LocalBehaviorSubject::new(0);
 
     let window = ApplicationWindow! {
         application: app,
@@ -46,14 +46,12 @@ fn build_ui_with_macros(app: &gtkrs::Application) {
             margin_bottom: 12,
             append: &Label! {
                 vexpand: true,
-                #label: &state.map(ToString::to_string)
+                #label: &state.clone().map(ToString::to_string)
             },
             append: &Button! {
                 label: "+1",
                 vexpand: true,
-                @clicked: glib::clone!{ @strong state =>
-                    move |_| state.with(|v| state.set(v + 1))
-                }
+                @clicked: move |_| state.clone().next_by(|n| n + 1)
             }
         }
     };
@@ -79,7 +77,7 @@ and a `'static` closure as value: `.connect().signal_name(move |_| do_something(
 
 ```rust
 fn build_ui_with_builders(app: &gtkrs::Application) {
-    let state = Reactive::new(0);
+    let state = LocalBehaviorSubject::new(0);
 
     let window = gtkrs::ApplicationWindow::ousia()
         .application(app)
@@ -94,15 +92,13 @@ fn build_ui_with_builders(app: &gtkrs::Application) {
             .spacing(6)
             .append( &gtkrs::Label::ousia()
                 .vexpand(true)
-                .bind().label(&state.map(ToString::to_string))
+                .bind().label(&state.clone().map(ToString::to_string))
                 .create()
             )
             .append( &gtkrs::Button::forte()
                 .label("+1")
                 .vexpand(true)
-                .connect().clicked(glib::clone!{ @strong state =>
-                    move |_| state.with(|v| state.set(v + 1))
-                })
+                .connect().clicked(move |_| state.clone().next_by(|n| n + 1))
                 .create()
             )
             .create()
@@ -113,23 +109,25 @@ fn build_ui_with_builders(app: &gtkrs::Application) {
 
 ```
 
-## Rx-like development with `Reactive`
+## Rx development with `rxrust`
 
-A `Reactive` is a GObject that houses one value, which can be mapped and tracked 
-along your program. It should form the basis and crux of your data in your application,
-while your widgets and view stays static. 
+The `rxrust` crate provides an Rx-compliant API for writing Observables and using subscriptions
+to pass messages throughout your program. Ousia uses rxrust in order to provide the best 
+asynchronous MVVM experience in the safety and swiftness of Rust.
 
 ### Features
 
-- Create a reactive monad using `Reactive::new(value)`, with `value` being its initial value
-- Set its value into something else using the `.set(new_value)` method. This notifies all the
-children reactive monads accordingly
-- Map it into something else using the `.map(move |value| value.change())` method.
-Now every time the original reactive's value changes, the mapped one will change accordingly 
-to the mapping function
+- A respectable amount of Rx types and operators are implemented in rxRust. 
+Choose the one that matches your needs!
+- Use a `LocalBehaviorSubject` for a reactive-like widget state, that works just like 
+`react.js`'s `useState` or `vue.js`'s `reactive`
 - Use it in gtk objects with the `#` prefix in macros or the `.bind()` builder provider. Now
-every time the monad's value changes, the UI is updated accordingly.
+every time the observable casts to subscribers, the UI is updated accordingly.
+- Use asynchronous programming using Shared Observables, and use them in your ui using the 
+`.glib_context_local()` operator, that translates a shared observable into a local one using
+glib's `MainContext` sender and receiver
 
-### Future plans
+## Examples
 
-- Create the ability to filter updates based on the monad's value.
+More examples can be found in the `examples` subcrate, where you'll find an application written in
+ousia with multiple widgets showcasing its abilities, including asynchronous programming.

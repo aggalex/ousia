@@ -2,5 +2,5 @@
 members = [
     "generation",
     "ousia",
-    "ousia_macros"
+    "example"
 ]

@@ -17,27 +17,21 @@ impl Property {
         let property_name = &self.name;
         let attrs = &self.attrs;
 
-        fn unpack_ty(ty: &Type) -> (TokenStream, bool, TokenStream) {
+        fn unpack_ty(ty: &Type) -> (TokenStream, TokenStream) {
             match ty {
                 Type::Reference(r) => {
-                    let (generics, _, ty) = unpack_ty(&*r.elem);
-                    (generics, false, ty)
+                    let (generics, ty) = unpack_ty(&*r.elem);
+                    (quote! ( #generics R: AsRef<#ty> ), quote!( R ))
                 }
                 Type::ImplTrait(item) => {
                     let bounds = &item.bounds;
-                    (quote! { <T: #bounds> }, true, quote! { T })
+                    (quote! { T: #bounds, }, quote! { T })
                 },
-                t => (quote! {}, true, quote! { #t })
+                t => (quote! {}, quote! { #t })
             }
         }
 
-        let (generic, asterisk, ty_token) = unpack_ty(ty);
-
-        let clone = if asterisk {
-            quote! ( .clone() )
-        } else {
-            quote! (  )
-        };
+        let (generic, ty_token) = unpack_ty(ty);
 
         if let Type::ImplTrait(item) = ty {
             let not_bindable = !item.bounds.iter()
@@ -54,12 +48,12 @@ impl Property {
 
         quote! {
             #( #attrs )*
-            pub fn #name #generic(&mut self, value: &(impl Prop<#ty_token> + ?Sized + 'static)) -> &mut #builder_name {
-                value.with(|val| self.builder.builder = std::mem::take(&mut self.builder.builder).#name(val #clone));
-                let value = value.clone();
+            pub fn #name <#generic>(&mut self,
+                handler: &(impl Handler<#ty_token> + ?Sized + 'static)
+            ) -> &mut #builder_name {
+                let handler = handler.clone();
                 self.builder.on_build(move |obj| {
-                    let obj = obj.clone();
-                    value.connect_update(move |value| obj.set_property(#property_name, value));
+                    handler.handle(obj, #property_name);
                 });
                 self.builder
             }

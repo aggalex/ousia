@@ -1,0 +1,11 @@
+[package]
+name = "example"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ousia = { path = "../ousia" }
+gtkrs = { version = "0.5.5", package = "gtk4" }
+rxrust = { git = "https://github.com/aggalex/rxRust/", branch = "behavior_trait" }

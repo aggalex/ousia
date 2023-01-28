@@ -15,7 +15,7 @@ pub struct Generator {
 impl Default for Generator {
     fn default() -> Self {
         Generator {
-            target: PathBuf::from("../../ousia"),
+            target: PathBuf::from("ousia"),
             source_crate: PathBuf::from(option_env!("SOURCE_CRATE")
                 .unwrap_or("gtk4-rs/gtk4")),
             formatter: Box::new(|tt| RustFmt::default()
