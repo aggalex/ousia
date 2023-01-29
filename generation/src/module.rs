@@ -26,7 +26,8 @@ impl ToTokens for Submodule {
 
         *tokens = quote! {
             #( #attrs )*
-            pub mod #ident
+            pub mod #ident;
+            pub use #ident::*;
         }
     }
 }
@@ -77,7 +78,7 @@ impl ToTokens for Module {
             .collect::<Vec<_>>();
 
         *tokens = quote! {
-            #( #modules; )*
+            #( #modules )*
         };
     }
 }

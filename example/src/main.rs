@@ -1,5 +1,5 @@
-use gtkrs::{Application, ApplicationWindow};
-use gtkrs::prelude::*;
+use gtk::{Application, ApplicationWindow};
+use gtk::prelude::*;
 use ::ousia::{*, prelude::*};
 
 mod asynchronous;
