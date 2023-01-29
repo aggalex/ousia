@@ -288,7 +288,7 @@ impl ToTokens for Class {
             #[macro_export]
             macro_rules! #name {
                 { $($rest:tt)* } => {
-                    ousia! { (gtkrs::#name::ousia()) $($rest)* }
+                    ousia! { ( ::ousia::ousia::#builder_name::default()) $($rest)* }
                 }
             }
         };

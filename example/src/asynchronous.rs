@@ -1,7 +1,7 @@
-use gtkrs::glib::{MainContext, PRIORITY_DEFAULT, timeout_future_seconds};
+use gtk::glib::{MainContext, PRIORITY_DEFAULT, timeout_future_seconds};
 use ::ousia::{*, prelude::{*}};
-use gtkrs::prelude::*;
-use gtkrs::Widget;
+use gtk::prelude::*;
+use gtk::Widget;
 use rxrust::prelude::*;
 use ::ousia::prelude::ToLocalGlib;
 

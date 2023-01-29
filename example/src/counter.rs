@@ -1,5 +1,5 @@
-use gtkrs::prelude::*;
-use gtkrs::Widget;
+use gtk::prelude::*;
+use gtk::Widget;
 use rxrust::prelude::*;
 use ::ousia::{*, prelude::*};
 
@@ -7,7 +7,7 @@ pub fn counter() -> impl IsA<Widget> {
     let state = LocalBehaviorSubject::new(0);
     
     Box! {
-        orientation: gtkrs::Orientation::Vertical,
+        orientation: gtk::Orientation::Vertical,
         spacing: 6,
         margin_start: 12,
         margin_end: 12,
