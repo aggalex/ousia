@@ -18,9 +18,13 @@ fn main() {
         target,
         source_crate: PathBuf::from(option_env!("SOURCE_CRATE")
             .unwrap_or("../generation/gtk4-rs/gtk4")),
-        included: Some(vec!["application.rs", "application_window.rs", "box_.rs", "button.rs", "label.rs"]),
+        // included: Some(vec!["application.rs", "application_window.rs", "box_.rs", "button.rs", "label.rs"]),
+        excluded_classes: vec!["ParamSpecExpression".to_string()],
         ..Default::default()
     }
+        .parse()
+        .unwrap()
+        .populate()
         .generate()
         .unwrap();
 

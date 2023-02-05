@@ -46,6 +46,9 @@ fn test_generate() {
         included: Some(vec!["application.rs", "application_window.rs", "box_.rs", "button.rs", "label.rs"]),
         ..Generator::default()
     }
+        .parse()
+        .unwrap()
+        .populate()
         .generate()
         .unwrap();
 
