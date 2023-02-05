@@ -1,15 +1,16 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
-use quote::__private::{TokenStream, TokenTree};
+use quote::__private::{Ident, Punct, Spacing, TokenStream, TokenTree};
 use quote::{format_ident, quote, ToTokens};
 use syn::{Attribute, File, GenericArgument, ImplItem, Item, ItemUse, PathArguments, Type, UseTree};
+use syn::ReturnType::Default;
 use syn::spanned::Spanned;
 use crate::prop::Property;
 use crate::signal::Signal;
 
 const ALLOWED_IMPORTS: &[&str] = &["crate", "glib", "gio"];
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GtkImport {
     tree: UseTree,
     attrs: Vec<Attribute>
@@ -45,13 +46,85 @@ impl ToTokens for GtkImport {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Class {
     pub name: String,
     pub setters: HashMap<String, Property>,
     pub used: Vec<GtkImport>,
     pub signals: HashMap<String, Signal>,
-    pub isWidget: bool,
+    pub inherits: Vec<String>,
+    pub constructible: bool
+}
+
+impl Class {
+    pub fn add_builder_from_file(&mut self, file: &File) -> Result<&mut Self, syn::Error> {
+        const EXCLUDED: &[&str] = &["new", "build"];
+
+        let setter_iter = file.items.iter()
+            .filter_map(|item| match item {
+                Item::Impl(item) => Some(item),
+                _ => None
+            })
+            .filter(|item| item.trait_.is_none())
+            .filter(|item| match &*item.self_ty {
+                Type::Path(path) => path.path.segments
+                    .last().unwrap().ident == self.builder_name().to_string(),
+                _ => false
+            })
+            .next()
+            .ok_or(syn::Error::new(file.span(), "No builder implementation found"))?
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                ImplItem::Method(f) => Some(f),
+                _ => None
+            })
+            .filter(|f| !EXCLUDED.contains(&&*f.sig.ident.to_string()))
+            .filter_map(|f| Property::try_from(f).ok())
+            .map(|prop| (prop.name.to_string(), prop));
+
+        self.constructible = true;
+        self.setters.extend(setter_iter);
+
+        Ok(self)
+    }
+
+    pub fn add_signals_from_file(&mut self, file: &File) -> Result<&mut Self, syn::Error> {
+        let signal_iter = file.items.iter()
+            .filter_map(|item| match item {
+                Item::Impl(item) => Some(item),
+                _ => None
+            })
+            .filter(|item| item.trait_.as_ref()
+                .and_then(|item| item.1.segments.last())
+                .map(|seg| seg.ident.to_string().ends_with("Ext"))
+                .unwrap_or(false))
+            .flat_map(|item| &item.items)
+            .filter_map(|item| match item {
+                ImplItem::Method(m) => Some(m),
+                _ => None
+            })
+            .filter(|m| m.sig.ident.to_string().starts_with("connect_"))
+            .map(Signal::try_from)
+            .map(|sig|
+                sig.map(|sig| (sig.name.clone(), sig))
+            )
+            .collect::<Result<HashMap<_, _>, _>>()?;
+
+        self.signals.extend(signal_iter);
+
+        Ok(self)
+    }
+
+    pub fn add_props_from_class(&mut self, class: &Class) -> &mut Self {
+        self.setters.extend(class.setters.clone());
+        self
+    }
+
+    pub fn add_signals_from_class(&mut self, class: &Class) -> &mut Self {
+        self.signals.extend(class.signals.clone());
+        self
+    }
 }
 
 impl TryFrom<File> for Class {
@@ -76,6 +149,10 @@ impl TryFrom<File> for Class {
 
         let mut iter = mac
             .mac.tokens.clone().into_iter()
+            .take_while(|token| match token {
+                TokenTree::Punct(p) => p.as_char() != ';',
+                _ => true
+            })
             .filter_map(|token| match token {
                 TokenTree::Ident(ident) => Some(ident.to_string()),
                 _ => None
@@ -87,24 +164,22 @@ impl TryFrom<File> for Class {
             last_token = match (&*last_token, &*token) {
                 (_, "pub") => token,
                 ("pub", "struct") => token,
-                ("struct", _) => break token,
+                ("struct", _) => {
+                    break token
+                },
                 _ => "".to_string()
             }
         };
 
-        // automata to find if it extends widget
-        let isWidget = loop {
-            let token = match iter.next() {
-                Some(tk) => tk,
-                None => break false,
-            };
-            last_token = match (&*last_token, &*token) {
-                (_, "@") => token,
-                ("@", "extends") => token,
-                ("extends", "Widget") => break true,
-                _ => "".to_string()
-            }
-        };
+        const PARENT_TOKENS: &'static [&'static str] = &[
+            "implements",
+            "extends"
+        ];
+
+        let inherits = iter
+            .skip_while(|token| !PARENT_TOKENS.contains(&&**token))
+            .filter(|token| !PARENT_TOKENS.contains(&&**token))
+            .collect();
 
         let used = file.items.iter()
             .filter_map(|item| match item {
@@ -114,72 +189,46 @@ impl TryFrom<File> for Class {
             .filter_map(|item| GtkImport::try_from(item).ok())
             .collect();
 
-        let builder_name = format!("{name}Builder");
-
-        const EXCLUDED: &[&str] = &["new", "build"];
-
-        let setters = file.items.iter()
-            .filter_map(|item| match item {
-                Item::Impl(item) => Some(item),
-                _ => None
-            })
-            .filter(|item| item.trait_.is_none())
-            .filter(|item| match &*item.self_ty {
-                Type::Path(path) => path.path.segments
-                    .last().unwrap().ident == builder_name,
-                _ => false
-            })
-            .next()
-            .ok_or(syn::Error::new(file.span(), "No builder implementation found"))?
-            .items
-            .iter()
-            .filter_map(|item| match item {
-                ImplItem::Method(f) => Some(f),
-                _ => None
-            })
-            .filter(|f| !EXCLUDED.contains(&&*f.sig.ident.to_string()))
-            .filter_map(|f| Property::try_from(f).ok())
-            .map(|prop| (prop.name.to_string(), prop))
-            .collect();
-
-        let signals = file.items.iter()
-            .filter_map(|item| match item {
-                Item::Impl(item) => Some(item),
-                _ => None
-            })
-            .filter(|item| item.trait_.as_ref()
-                .and_then(|item| item.1.segments.last())
-                .map(|seg| seg.ident.to_string().ends_with("Ext"))
-                .unwrap_or(false))
-            .flat_map(|item| &item.items)
-            .filter_map(|item| match item {
-                ImplItem::Method(m) => Some(m),
-                _ => None
-            })
-            .filter(|m| m.sig.ident.to_string().starts_with("connect_"))
-            .map(Signal::try_from)
-            .map(|sig|
-                sig.map(|sig| (sig.name.clone(), sig))
-            )
-            .collect::<Result<HashMap<_, _>, _>>()?;
-
-        Ok(Class {
+        let mut class = Class {
             name,
             used,
-            setters,
-            signals,
-            isWidget
-        })
+            setters: HashMap::new(),
+            signals: HashMap::new(),
+            inherits,
+            constructible: false
+        };
+
+        if &class.name == "Button" {
+            println!("Button inherits: {:?}", class.inherits);
+        }
+
+        let _ = class
+            .add_builder_from_file(&file);
+
+        let _ = class
+            .add_signals_from_file(&file);
+
+        Ok(class)
     }
 }
 
-impl ToTokens for Class {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let builder_name = format_ident!("{}Builder", self.name);
-        let uses = self.used.iter()
-            .map(ToTokens::to_token_stream)
-            .collect::<Vec<_>>();
+impl Class {
+
+    fn builder_name(&self) -> Ident {
+        format_ident!("{}Builder", self.name)
+    }
+
+    fn template_name(&self) -> Ident {
+        format_ident!("{}Template", self.name)
+    }
+
+    fn class_name(&self) -> Ident {
+        format_ident!("{}", &self.name)
+    }
+
+    fn create_builder(&self) -> TokenStream {
         let name = format_ident!("{}", &self.name);
+        let builder_name = self.builder_name();
         let binder_name = format_ident!("{}Binder", &self.name);
         let signals_name = format_ident!("{}Signals", &self.name);
 
@@ -198,19 +247,7 @@ impl ToTokens for Class {
             ))
             .collect::<Vec<_>>();
 
-        let cleanup = match self.isWidget {
-            true => quote!( self.connect_destroy(f); ),
-            false => quote!()
-        };
-
-        *tokens = quote! {
-            #![allow(dead_code, unused_imports)]
-
-            #( #uses )*
-            use gtkrs::{ *, #name, prelude::*, traits::* };
-            use crate::prelude::*;
-            use rxrust::prelude::*;
-
+        quote! {
             #[derive(Default)]
             pub struct #builder_name {
                 builder: gtkrs::builders::#builder_name,
@@ -260,9 +297,7 @@ impl ToTokens for Class {
             }
 
             impl<'builder> #binder_name<'builder> {
-
                 #( #binders )*
-
             }
 
             pub struct #signals_name<'builder> {
@@ -270,17 +305,45 @@ impl ToTokens for Class {
             }
 
             impl<'builder> #signals_name<'builder> {
-
                 #( #signals )*
-
             }
 
             impl ForteExt for #name {
                 type Builder = #builder_name;
             }
+        }
+    }
+
+}
+
+impl ToTokens for Class {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let builder_name = self.builder_name();
+        let name = self.class_name();
+
+        let uses = self.used.iter()
+            .map(ToTokens::to_token_stream)
+            .collect::<Vec<_>>();
+
+        let cleanup = match self.signals.contains_key("destroy") {
+            true => quote!( self.connect_destroy(move |_| _f()); ),
+            false => quote!()
+        };
+
+        let builder = self.create_builder();
+
+        *tokens = quote! {
+            #![allow(dead_code, unused_imports)]
+
+            #( #uses )*
+            use gtkrs::{ *, #name, prelude::*, traits::* };
+            use crate::prelude::*;
+            use rxrust::prelude::*;
+
+            #builder
 
             impl Cleanup for #name {
-                fn cleanup(&self, f: impl FnMut() + 'static) {
+                fn cleanup(&self, mut _f: impl Fn() + 'static) {
                     #cleanup
                 }
             }

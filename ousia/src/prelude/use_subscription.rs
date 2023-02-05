@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::marker::PhantomData;
 use gtkrs::glib::{IsA, Object, ObjectExt, ObjectType, ToValue};
 use gtkrs::prelude::WidgetExt;
@@ -9,7 +10,7 @@ use rxrust::prelude::{BehaviorSubject, LocalBehaviorSubject, LocalObservable, Ob
 use rxrust::shared::SharedObservable;
 
 pub trait Cleanup: gtkrs::prelude::ObjectType {
-    fn cleanup(&self, f: impl FnMut() + 'static);
+    fn cleanup(&self, f: impl Fn() + 'static);
 }
 
 pub trait Handler<T>: Clone {
@@ -24,9 +25,16 @@ impl<T, S> Handler<T> for S
     fn handle(&self, obj: &(impl IsA<glib::Object> + Cleanup), prop: &str) {
         let obj_clone = obj.clone();
         let prop = prop.to_string();
-        let mut sub = self.clone().subscribe(move |value|
+        let sub = self.clone().subscribe(move |value|
             obj_clone.set_property(&prop, value)
         );
-        obj.cleanup(move || sub.unsubscribe());
+        let sub = RefCell::new(Some(sub));
+        obj.cleanup(move || {
+            let mut sub = sub.borrow_mut();
+            if let Some(s) = &mut *sub {
+                s.unsubscribe();
+                *sub = None;
+            }
+        });
     }
 }

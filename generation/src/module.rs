@@ -27,6 +27,7 @@ impl ToTokens for Submodule {
         *tokens = quote! {
             #( #attrs )*
             pub mod #ident;
+            #( #attrs )*
             pub use #ident::*;
         }
     }

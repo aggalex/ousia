@@ -1,5 +1,3 @@
-#![feature(let_else)]
-
 #[cfg(test)]
 mod tests;
 pub mod class;

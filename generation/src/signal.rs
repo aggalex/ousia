@@ -3,7 +3,7 @@ use quote::{format_ident, quote};
 use syn::{Attribute, GenericParam, Ident, ImplItemMethod, PathArguments, ReturnType, Type, TypeParamBound};
 use syn::spanned::Spanned;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Signal {
     pub name: String,
     pub args: Vec<Type>,
