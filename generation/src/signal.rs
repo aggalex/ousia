@@ -1,6 +1,6 @@
 use quote::__private::TokenStream;
 use quote::{format_ident, quote};
-use syn::{Attribute, GenericParam, Ident, ImplItemFn, PathArguments, ReturnType, Type, TypeParamBound};
+use syn::{Attribute, GenericParam, Ident, ImplItemFn, Meta, MetaNameValue, PathArguments, ReturnType, TraitItem, TraitItemFn, Type, TypeParamBound};
 use syn::spanned::Spanned;
 
 #[derive(Clone, Debug)]
@@ -19,7 +19,20 @@ impl Signal {
         let ty = &self.args;
         let connector = format_ident!("connect_{}", name);
         let ret = &self.ret;
-        let attrs = &self.attrs;
+        let attrs = &self.attrs
+            .iter()
+            .filter(|attr| {
+                let quote = quote!(#attr).to_string();
+                let Meta::List(ref list) = attr.meta else { return true };
+                if !list.path.segments.last().is_some_and(|path| path.ident == "doc") {
+                    return true
+                }
+                let Ok(arg) = list.parse_args::<MetaNameValue>() else { return true };
+
+                let path_quote = quote!(#arg).to_string();
+                !arg.path.segments.last().is_some_and(|seg| seg.ident == "alias")
+            })
+            .collect::<Vec<_>>();
         let fn_bound = format_ident!("{}", self.fn_bound);
 
         quote! {
@@ -32,13 +45,17 @@ impl Signal {
     }
 }
 
-impl TryFrom<&ImplItemFn> for Signal {
+impl TryFrom<&TraitItemFn> for Signal {
     type Error = syn::Error;
 
-    fn try_from(item: &ImplItemFn) -> Result<Self, Self::Error> {
+    fn try_from(item: &TraitItemFn) -> Result<Self, Self::Error> {
         let mut name = item.sig.ident.to_string();
         if !name.starts_with("connect_") {
             return Err(syn::Error::new(item.sig.ident.span(), "Not a signal"));
+        }
+
+        if &name[..] == "connect_clicked" {
+            println!("breakpoint");
         }
 
         name = name.chars()

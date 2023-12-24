@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use quote::{format_ident, quote, ToTokens};
 use quote::__private::TokenStream;
 use proc_macro2::TokenTree;
-use syn::{Attribute, File, Ident, ImplItem, Item, ItemUse, Type, UseTree};
+use syn::{Attribute, File, Ident, ImplItem, Item, ItemUse, TraitItem, Type, UseTree};
 use syn::spanned::Spanned;
 use crate::prop::Property;
 use crate::signal::Signal;
@@ -92,16 +92,17 @@ impl Class {
     pub fn add_signals_from_file(&mut self, file: &File) -> Result<&mut Self, syn::Error> {
         let signal_iter = file.items.iter()
             .filter_map(|item| match item {
-                Item::Impl(item) => Some(item),
+                Item::Trait(item) => Some(item),
                 _ => None
             })
-            .filter(|item| item.trait_.as_ref()
-                .and_then(|item| item.1.segments.last())
-                .map(|seg| seg.ident.to_string().ends_with("Ext"))
-                .unwrap_or(false))
+            .filter(|item| item.ident.to_string().ends_with("Ext"))
+            .map(|item| {
+                let quote = quote!(#item).to_string();
+                item
+            })
             .flat_map(|item| &item.items)
             .filter_map(|item| match item {
-                ImplItem::Fn(m) => Some(m),
+                TraitItem::Fn(m) => Some(m),
                 _ => None
             })
             .filter(|m| m.sig.ident.to_string().starts_with("connect_"))

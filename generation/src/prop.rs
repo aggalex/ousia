@@ -40,7 +40,7 @@ impl Property {
                     _ => None
                 })
                 .map(|tr| tr.path.segments.first().unwrap().ident.to_string())
-                .any(|trait_name| trait_name == "IsA");
+                .any(|trait_name| trait_name == "Into");
 
             if not_bindable {
                 return quote! {}
