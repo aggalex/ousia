@@ -4,7 +4,9 @@ use rxrust::prelude::*;
 use ::ousia::{*, prelude::*};
 
 pub fn counter() -> impl IsA<Widget> {
-    let state = BehaviorSubject::new(0);
+    let state = BehaviorSubject::<_, Subject<_, _>>::new(0);
+
+    state.clone().subscribe(|n| println!("next: {n}"));
 
     Box! {
         orientation: gtk::Orientation::Vertical,
@@ -21,6 +23,7 @@ pub fn counter() -> impl IsA<Widget> {
             label: "+1",
             vexpand: true,
             @clicked: move |_| {
+                println!("pass");
                 state.clone().next_by(|value| value + 1);
             }
         }

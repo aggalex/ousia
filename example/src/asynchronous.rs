@@ -13,7 +13,8 @@ pub fn asynchronous() -> impl IsA<Widget> {
 }
 
 fn wait_button() -> impl IsA<Widget> {
-    let shared_state = BehaviorSubject::new(0);
+    let shared_state = BehaviorSubject::<_, Subject<_, _>>::new(0i32);
+    let state = shared_state.clone();
 
     let run = move || {
         let state = shared_state.clone();
@@ -28,11 +29,27 @@ fn wait_button() -> impl IsA<Widget> {
 
     Button! {
         hexpand: true,
-        #label: &shared_state.clone().map(|value| match value {
+        #label: &state.clone().map(|value| match value {
             0 => "Wait for 6s".to_string(),
             n => format!("t - {}s", n)
         }),
-        #sensitive: &shared_state.clone().map(|value| value == 0),
+        #sensitive: &state.clone().map(|value| value == 0),
         @clicked: move |_| { run(); }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test() {
+        use rxrust::prelude::*;
+        let mut behavior = BehaviorSubject::<i32, Subject::<_, _>>::new(0);
+        behavior.clone()
+            .subscribe(|value| println!("{value}"));
+        behavior.next(7);
+        for i in 0..10 {
+            behavior.next_by(|n| n + 1);
+        }
+        println!("{}", behavior.peek());
     }
 }
