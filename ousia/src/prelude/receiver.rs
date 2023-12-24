@@ -1,19 +1,16 @@
-use gtkrs::glib::{Continue, MainContext, Priority, PRIORITY_DEFAULT, Sender};
+use gtkrs::glib::{MainContext, Priority, Sender};
 use rxrust::prelude::*;
 
 pub trait ToLocalGlib<N, E> {
 
-    fn glib_context_local(self, priority: Priority) -> LocalSubject<'static, N, E>;
+    fn glib_context_local(self, priority: Priority) -> Subject<'static, N, E>;
 }
 
 static ERR_MSG: &'static str = "Unable to send to main context";
 
 struct GLibSenderObserver<Item, Error> (pub Sender<Option<Result<Item, Error>>>);
 
-impl<Item, Error> Observer for GLibSenderObserver<Item, Error> {
-    type Item = Item;
-    type Err = Error;
-
+impl<Item, Error> Observer<Item, Error> for GLibSenderObserver<Item, Error> {
     fn next(&mut self, value: Self::Item) {
         self.0.send(Some(Ok(value))).expect(ERR_MSG)
     }
@@ -24,6 +21,10 @@ impl<Item, Error> Observer for GLibSenderObserver<Item, Error> {
 
     fn complete(&mut self) {
         self.0.send(None).expect(ERR_MSG)
+    }
+
+    fn is_finished(&self) -> bool {
+        false
     }
 }
 

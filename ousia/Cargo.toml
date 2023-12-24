@@ -9,8 +9,8 @@ keywords = ["gtk"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-gtkrs = { version = "0.5.5", package = "gtk4" }
-rxrust = { git = "https://github.com/aggalex/rxRust/", branch = "behavior_trait" }
+gtkrs = { version = "0.7.3", package = "gtk4" }
+rxrust = "1.0.0-beta.6"
 
 [build-dependencies]
 generation = { path = "../generation" }

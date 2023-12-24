@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
-use quote::__private::{Ident, Punct, Spacing, TokenStream, TokenTree};
 use quote::{format_ident, quote, ToTokens};
-use syn::{Attribute, File, GenericArgument, ImplItem, Item, ItemUse, PathArguments, Type, UseTree};
-use syn::ReturnType::Default;
+use quote::__private::TokenStream;
+use proc_macro2::TokenTree;
+use syn::{Attribute, File, Ident, ImplItem, Item, ItemUse, Type, UseTree};
 use syn::spanned::Spanned;
 use crate::prop::Property;
 use crate::signal::Signal;
@@ -76,7 +76,7 @@ impl Class {
             .items
             .iter()
             .filter_map(|item| match item {
-                ImplItem::Method(f) => Some(f),
+                ImplItem::Fn(f) => Some(f),
                 _ => None
             })
             .filter(|f| !EXCLUDED.contains(&&*f.sig.ident.to_string()))
@@ -101,7 +101,7 @@ impl Class {
                 .unwrap_or(false))
             .flat_map(|item| &item.items)
             .filter_map(|item| match item {
-                ImplItem::Method(m) => Some(m),
+                ImplItem::Fn(m) => Some(m),
                 _ => None
             })
             .filter(|m| m.sig.ident.to_string().starts_with("connect_"))

@@ -1,6 +1,6 @@
 use quote::__private::TokenStream;
 use quote::{format_ident, quote, ToTokens};
-use syn::{Attribute, FnArg, Ident, ImplItemMethod, Type, TypeParamBound};
+use syn::{Attribute, FnArg, Ident, ImplItemFn, Type, TypeParamBound};
 use syn::spanned::Spanned;
 
 #[derive(Debug, Clone)]
@@ -61,10 +61,10 @@ impl Property {
     }
 }
 
-impl TryFrom<&ImplItemMethod> for Property {
+impl TryFrom<&ImplItemFn> for Property {
     type Error = syn::Error;
 
-    fn try_from(f: &ImplItemMethod) -> Result<Self, syn::Error> {
+    fn try_from(f: &ImplItemFn) -> Result<Self, syn::Error> {
         Ok(Property {
             name: f.sig.ident.to_string(),
             ty: *f.sig.inputs.iter()

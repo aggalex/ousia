@@ -6,8 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-syn = { version = "1.0.107", features = ["full", "extra-traits"] }
-quote = "1.0.23"
+syn = { version = "2.0.42", features = ["full", "extra-traits"] }
+quote = "1.0.33"
 rust-format = { version = "0.3.4", features = ["token_stream"] }
 convert_case = "0.6.0"
 regex = "1.7.1"
+proc-macro2 = "1.0.71"

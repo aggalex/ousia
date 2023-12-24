@@ -6,8 +6,7 @@ use gtkrs::{Application, glib, Widget};
 use gtkrs::pango::Item;
 use gtkrs::SortColumn::Default;
 use rxrust::observable::Observable;
-use rxrust::prelude::{BehaviorSubject, LocalBehaviorSubject, LocalObservable, Observer, SubscribeNext, SubscriptionLike};
-use rxrust::shared::SharedObservable;
+use rxrust::prelude::{Observer};
 
 pub trait Cleanup: gtkrs::prelude::ObjectType {
     fn cleanup(&self, f: impl Fn() + 'static);
@@ -17,9 +16,10 @@ pub trait Handler<T>: Clone {
     fn handle(&self, obj: &(impl IsA<glib::Object> + Cleanup), prop: &str);
 }
 
-impl<T, S> Handler<T> for S
+impl<T, S, O> Handler<T> for S
     where
-        S: LocalObservable<'static, Err = (), Item = T> + Clone + 'static,
+        S: Observable<T, (), O> + Clone + 'static,
+        O: Observer<T, ()>,
         T: ToValue + 'static
 {
     fn handle(&self, obj: &(impl IsA<glib::Object> + Cleanup), prop: &str) {

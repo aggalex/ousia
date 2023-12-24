@@ -1,6 +1,6 @@
 use quote::__private::TokenStream;
 use quote::{format_ident, quote};
-use syn::{Attribute, GenericParam, Ident, ImplItemMethod, PathArguments, ReturnType, Type, TypeParamBound};
+use syn::{Attribute, GenericParam, Ident, ImplItemFn, PathArguments, ReturnType, Type, TypeParamBound};
 use syn::spanned::Spanned;
 
 #[derive(Clone, Debug)]
@@ -32,10 +32,10 @@ impl Signal {
     }
 }
 
-impl TryFrom<&ImplItemMethod> for Signal {
+impl TryFrom<&ImplItemFn> for Signal {
     type Error = syn::Error;
 
-    fn try_from(item: &ImplItemMethod) -> Result<Self, Self::Error> {
+    fn try_from(item: &ImplItemFn) -> Result<Self, Self::Error> {
         let mut name = item.sig.ident.to_string();
         if !name.starts_with("connect_") {
             return Err(syn::Error::new(item.sig.ident.span(), "Not a signal"));

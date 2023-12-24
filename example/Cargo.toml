@@ -7,5 +7,5 @@ edition = "2021"
 
 [dependencies]
 ousia = { path = "../ousia" }
-gtk = { version = "0.5.5", package = "gtk4" }
-rxrust = { git = "https://github.com/aggalex/rxRust/", branch = "behavior_trait" }
+gtk = { version = "0.7.3", package = "gtk4" }
+rxrust = "1.0.0-beta.6"
