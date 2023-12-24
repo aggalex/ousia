@@ -1,4 +1,4 @@
-use gtk::{Application, ApplicationWindow};
+use gtk::Application;
 use gtk::prelude::*;
 use ::ousia::{*, prelude::*};
 

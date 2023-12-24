@@ -39,7 +39,8 @@ impl Property {
                     TypeParamBound::Trait(tr) => Some(tr),
                     _ => None
                 })
-                .any(|tr| tr.path.segments.first().unwrap().ident.to_string() == "IsA");
+                .map(|tr| tr.path.segments.first().unwrap().ident.to_string())
+                .any(|trait_name| trait_name == "IsA");
 
             if not_bindable {
                 return quote! {}
@@ -90,7 +91,7 @@ impl ToTokens for Property {
         *tokens = quote! {
             #( #attrs )*
             pub fn #name(&mut self, value: #ty) -> &mut Self {
-                self.builder = std::mem::take(&mut self.builder).#name(value);
+                self.builder = std::mem::take(&mut self.builder).map(|builder| builder.#name(value));
                 self
             }
         };

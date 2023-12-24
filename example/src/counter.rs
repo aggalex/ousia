@@ -4,7 +4,7 @@ use rxrust::prelude::*;
 use ::ousia::{*, prelude::*};
 
 pub fn counter() -> impl IsA<Widget> {
-    let state = LocalBehaviorSubject::new(0);
+    let state = BehaviorSubject::new(0);
 
     Box! {
         orientation: gtk::Orientation::Vertical,

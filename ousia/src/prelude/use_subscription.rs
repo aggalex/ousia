@@ -1,12 +1,8 @@
 use std::cell::RefCell;
-use std::marker::PhantomData;
-use gtkrs::glib::{IsA, Object, ObjectExt, ObjectType, ToValue};
-use gtkrs::prelude::WidgetExt;
-use gtkrs::{Application, glib, Widget};
-use gtkrs::pango::Item;
-use gtkrs::SortColumn::Default;
-use rxrust::observable::Observable;
-use rxrust::prelude::{Observer};
+use gtkrs::glib::{IsA, ObjectExt, Value};
+use gtkrs::glib;
+use rxrust::observable::ObservableItem;
+use rxrust::subscription::Subscription;
 
 pub trait Cleanup: gtkrs::prelude::ObjectType {
     fn cleanup(&self, f: impl Fn() + 'static);
@@ -16,25 +12,21 @@ pub trait Handler<T>: Clone {
     fn handle(&self, obj: &(impl IsA<glib::Object> + Cleanup), prop: &str);
 }
 
-impl<T, S, O> Handler<T> for S
+impl<T, S> Handler<T> for S
     where
-        S: Observable<T, (), O> + Clone + 'static,
-        O: Observer<T, ()>,
-        T: ToValue + 'static
+        S: ObservableItem<T, Box<dyn Fn(T)>> + Clone + 'static,
+        T: Into<Value> + 'static
 {
     fn handle(&self, obj: &(impl IsA<glib::Object> + Cleanup), prop: &str) {
         let obj_clone = obj.clone();
         let prop = prop.to_string();
-        let sub = self.clone().subscribe(move |value|
-            obj_clone.set_property(&prop, value)
-        );
+        let sub = self.clone().subscribe(Box::new(move |value| {
+            obj_clone.set_property(&prop, value);
+        }) as Box<dyn Fn(T)>);
         let sub = RefCell::new(Some(sub));
         obj.cleanup(move || {
-            let mut sub = sub.borrow_mut();
-            if let Some(s) = &mut *sub {
-                s.unsubscribe();
-                *sub = None;
-            }
+            let sub = std::mem::take(&mut *sub.borrow_mut());
+            sub.map(|s| s.unsubscribe());
         });
     }
 }

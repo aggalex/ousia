@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use quote::__private::TokenStream;
 use quote::ToTokens;
 use rust_format::{Formatter, RustFmt};
-use syn::{File, Pat};
+use syn::File;
 use crate::class::Class;
 use crate::module::Module;
 
@@ -129,7 +129,6 @@ impl Generator {
                     None
                 },
                 Err(e) => Some(Err(e)),
-                _ => None
             };
 
             let additional_builders = self.additional_builders.iter()
