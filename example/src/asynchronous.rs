@@ -1,3 +1,4 @@
+use ::ousia::prelude::use_callback::CallbackProvider;
 use gtk::glib::{MainContext, timeout_future_seconds};
 use ::ousia::{*, prelude::{*}};
 use gtk::prelude::*;
@@ -17,16 +18,13 @@ fn wait_button() -> impl IsA<Widget> {
 
     let run = {
         let state = state().r#use();
-        move || {
-            let state = state().r#use();
-            MainContext::default().spawn_local(async move {
-                for i in (0..6).rev() {
-                    state().next(i);
-                    timeout_future_seconds(1).await;
-                }
-                state().next(0);
-            });
-        }
+        MainContext::default().callback(async move || {
+            for i in (0..6).rev() {
+                state().next(i);
+                timeout_future_seconds(1).await;
+            }
+            state().next(0);
+        })
     };
 
     Button! {
