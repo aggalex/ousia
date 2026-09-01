@@ -74,15 +74,10 @@ impl<'a, Item> Map<&'a Item> for &'a Tagged<Item> {
 
 impl<Item: ToTokens> ToTokens for Tagged<Item> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let attrs = &self.tag.iter()
-            .map(|attr| attr.to_token_stream())
-            .collect::<Vec<_>>();
-        let tt = self.item.to_token_stream();
-
-        *tokens = quote! {
-            #( #attrs )*
-            #tt
+        for tag in &self.tag {
+            tag.to_tokens(tokens);
         }
+        self.item.to_tokens(tokens);
     }
 }
 
@@ -274,9 +269,9 @@ impl ToTokens for FeatureTag {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let arg_list = self.arg_list();
 
-        *tokens = quote! {
+        tokens.extend(quote! {
             #[cfg(#arg_list)]
-        }
+        })
     }
 }
 

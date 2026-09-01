@@ -26,17 +26,11 @@ fn main() {
         .unwrap()
         .populate();
 
-    let ungenerated = context.not_generated.clone();
+    context.diagnostics.emit();
+
+    if context.diagnostics.has_errors() {
+        panic!("ousia generation failed with errors (see diagnostics above)");
+    }
 
     context.generate().unwrap();
-
-    if ungenerated.len() != 0 {
-        println!("cargo:warning=Failed to generate bindings for {len} files: {files}",
-                 len = ungenerated.len(),
-                 files = ungenerated.into_iter()
-                     .map(|path| path.file_name().unwrap().to_str().unwrap().to_string())
-                     .collect::<Vec<_>>()
-                     .join(", ")
-        )
-    }
 }

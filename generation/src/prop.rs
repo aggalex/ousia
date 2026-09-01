@@ -37,19 +37,6 @@ impl Property {
 
         let (generic, ty_token) = unpack_ty(ty);
 
-        if let Type::ImplTrait(item) = ty {
-            let not_bindable = !item.bounds.iter()
-                .filter_map(|bound| match bound {
-                    TypeParamBound::Trait(tr) => Some(tr),
-                    _ => None
-                })
-                .any(|tr| tr.path.segments.first().unwrap().ident.to_string() == "IsA");
-
-            if not_bindable {
-                return quote! {}
-            }
-        }
-
         quote! {
             #( #attrs )*
             pub fn #name <#generic>(&mut self,

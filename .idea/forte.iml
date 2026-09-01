@@ -39,6 +39,7 @@
       <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gtk4/sys/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gtk4/sys/tests" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gtk4/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/prelude/target" />
       <excludeFolder url="file://$MODULE_DIR$/generation/gtk4-rs/target" />
