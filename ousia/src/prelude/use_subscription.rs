@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::convert::Infallible;
 use std::marker::PhantomData;
 use gtkrs::glib::Object;
 use gtkrs::glib::prelude::{IsA, ObjectExt, ToValue};
@@ -11,7 +10,7 @@ pub trait Cleanup: gtkrs::prelude::ObjectType {
     fn cleanup(&self, f: impl Fn() + 'static);
 }
 
-pub trait Handler<T>: Clone {
+pub trait Handler: Clone {
     fn handle(&self, obj: &(impl IsA<Object> + Cleanup), prop: &str);
 }
 
@@ -21,12 +20,12 @@ struct PropertySetter<N> {
     _marker: PhantomData<fn(N)>,
 }
 
-impl<N: ToValue> Observer<N, Infallible> for PropertySetter<N> {
+impl<N: ToValue> Observer<N, ()> for PropertySetter<N> {
     fn next(&mut self, value: N) {
         self.obj.set_property(&self.prop, &value);
     }
 
-    fn error(self, _err: Infallible) {}
+    fn error(self, _err: ()) {}
 
     fn complete(self) {}
 
@@ -35,10 +34,9 @@ impl<N: ToValue> Observer<N, Infallible> for PropertySetter<N> {
     }
 }
 
-impl<T, S> Handler<T> for S
+impl<S> Handler for S
     where
         S: Observable + Clone + 'static,
-        T: ToValue + 'static,
         for<'a> S::Item<'a>: ToValue,
         for<'a> S::Inner: CoreObservable<S::With<PropertySetter<S::Item<'a>>>>,
 {
@@ -57,5 +55,16 @@ impl<T, S> Handler<T> for S
                 s.unsubscribe();
             }
         });
+    }
+}
+
+pub trait Hook {
+    fn r#use(self) -> impl Clone + Fn() -> Self;
+}
+
+impl<O: Clone + 'static> Hook for O {
+
+    fn r#use(self) -> impl Clone + Fn() -> Self {
+        move || self.clone()
     }
 }

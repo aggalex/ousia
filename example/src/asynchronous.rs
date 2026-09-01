@@ -13,29 +13,29 @@ pub fn asynchronous() -> impl IsA<Widget> {
 }
 
 fn wait_button() -> impl IsA<Widget> {
-    let scheduler = GlibScheduler::default();
-    let shared_state = Shared::behavior_subject(0);
-    let state = shared_state.clone()
-        .observe_on(scheduler);
+    let state = Local::behavior_subject(0).r#use();
 
-    let run = move || {
-        let state = shared_state.clone();
-        MainContext::default().spawn_local(async move {
-            for i in (0..6).rev() {
-                state.clone().next(i);
-                timeout_future_seconds(1).await;
-            }
-            state.clone().next(0);
-        });
+    let run = {
+        let state = state().r#use();
+        move || {
+            let state = state().r#use();
+            MainContext::default().spawn_local(async move {
+                for i in (0..6).rev() {
+                    state().next(i);
+                    timeout_future_seconds(1).await;
+                }
+                state().next(0);
+            });
+        }
     };
 
     Button! {
         hexpand: true,
-        #label: &state.clone().map(|value| match value {
+        #label: &state().map(|value| match value {
             0 => "Wait for 6s".to_string(),
             n => format!("t - {}s", n)
         }),
-        #sensitive: &state.clone().map(|value| value == 0),
+        #sensitive: &state().map(|value| value == 0),
         @clicked: move |_| { run(); }
     }
 }

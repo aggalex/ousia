@@ -2,6 +2,7 @@ use gtkrs::prelude::*;
 use ::ousia::prelude::*;
 use ::ousia::*;
 use gtkrs::glib;
+use rxrust::prelude::*;
 
 fn main() {
     // Create a new application
@@ -15,7 +16,7 @@ fn main() {
 }
 
 fn build_ui(app: &gtkrs::Application) {
-    let state = Reactive::new(0);
+    let state = Local::behavior_subject(0);
 
     let window = ApplicationWindow! {
         application: app,
@@ -26,13 +27,16 @@ fn build_ui(app: &gtkrs::Application) {
             orientation: gtkrs::Orientation::Vertical,
             spacing: 6,
             append: &Label! {
-                bind_label: &state.map(i32::to_string)
+                #label: &state.clone().map(|n| n.to_string())
             },
             append: &Button! {
                 label: "+1",
-                @connect_clicked: glib::clone!{ @strong state =>
-                    move |_| state.with(|v| state.set(v + 1))
-                }
+                @clicked: glib::clone!(
+                    #[strong] state,
+                    move |_| {
+                        state.clone().next_by(|v| v + 1);
+                    },
+                )
             }
         }
     };

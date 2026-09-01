@@ -1,10 +1,14 @@
 use gtk::prelude::*;
-use gtk::{Button, Widget};
+use gtk::{Widget};
 use rxrust::prelude::*;
 use ::ousia::{*, prelude::*};
 
 pub fn counter() -> impl IsA<Widget> {
-    let state = Local::behavior_subject(0);
+    let state = Local::behavior_subject(0).r#use();
+
+    let string_memo = state()
+        .map(|value| value.to_string())
+        .r#use();
 
     Box! {
         orientation: gtk::Orientation::Vertical,
@@ -15,13 +19,13 @@ pub fn counter() -> impl IsA<Widget> {
         margin_bottom: 12,
         append: &Label! {
             vexpand: true,
-            #label: &state.clone().map(|n| n.to_string())
+            #label: &string_memo()
         },
         append: &Button! {
             label: "+1",
             vexpand: true,
             @clicked: move |_| {
-                state.clone().next_by(|value| value + 1);
+                state().next_by(|value| value + 1);
             }
         }
     }

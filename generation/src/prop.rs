@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
-use syn::{Attribute, FnArg, Ident, ImplItemFn, Type, TypeParamBound};
+use syn::{Attribute, FnArg, Ident, ImplItemFn, Type};
 use syn::spanned::Spanned;
 use crate::attribute::AttributeExtension;
 
@@ -14,33 +14,16 @@ pub struct Property {
 impl Property {
     pub fn bind_method(&self, builder_name: &Ident) -> TokenStream {
         let name = format_ident!("{}", &self.name);
-        let ty = &self.ty;
         let property_name = &self.name;
         let attrs = &self.attrs
             .iter()
             .filter(|attr| attr.is_not_synonymous_doc_to_item(property_name))
             .collect::<Vec<_>>();
 
-        fn unpack_ty(ty: &Type) -> (TokenStream, TokenStream) {
-            match ty {
-                Type::Reference(r) => {
-                    let (generics, ty) = unpack_ty(&*r.elem);
-                    (quote! ( #generics R: AsRef<#ty> ), quote!( R ))
-                }
-                Type::ImplTrait(item) => {
-                    let bounds = &item.bounds;
-                    (quote! { T: #bounds, }, quote! { T })
-                },
-                t => (quote! {}, quote! { #t })
-            }
-        }
-
-        let (generic, ty_token) = unpack_ty(ty);
-
         quote! {
             #( #attrs )*
-            pub fn #name <#generic>(&mut self,
-                handler: &(impl Handler<#ty_token> + ?Sized + 'static)
+            pub fn #name (&mut self,
+                handler: &(impl Handler + ?Sized + 'static)
             ) -> &mut #builder_name {
                 let handler = handler.clone();
                 self.builder.on_build(move |obj| {

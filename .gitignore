@@ -5,3 +5,4 @@
 /prelude/target
 **/Cargo.lock
 /ousia/src/ousia/
+/index.sqlite3

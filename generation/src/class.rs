@@ -280,11 +280,20 @@ impl Class {
             .collect::<Vec<_>>();
 
         quote! {
-            #[derive(Default)]
             pub struct #builder_name {
                 builder: Option<gtkrs::builders::#builder_name>,
                 on_build: Vec<std::boxed::Box<dyn FnOnce(&gtkrs::#name) + 'static>>,
                 object: Option<gtkrs::#name>
+            }
+
+            impl Default for #builder_name {
+                fn default() -> Self {
+                    Self {
+                        builder: Some(gtkrs::#name::builder()),
+                        on_build: Vec::new(),
+                        object: None
+                    }
+                }
             }
 
             impl #builder_name {
@@ -313,11 +322,11 @@ impl Class {
             impl crate::prelude::Builder for #builder_name {
                 type Target = #name;
 
-                fn build(&mut self, func: impl Fn(Self::Target)) {
+                fn build(&mut self, func: impl FnOnce(Self::Target)) {
                     func(self.create());
                 }
                 fn create(&mut self) -> Self::Target {
-                    let mut builder = self.builder.take().unwrap();
+                    let builder = self.builder.take().unwrap();
                     let obj = builder.build();
                     std::mem::take(&mut self.on_build).into_iter()
                         .for_each(|f| f(&obj));
