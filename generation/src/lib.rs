@@ -8,6 +8,7 @@ pub mod generate;
 pub mod module;
 pub mod signal;
 pub mod attribute;
+pub mod diagnostics;
 
 extern crate syn;
 extern crate quote;

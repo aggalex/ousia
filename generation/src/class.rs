@@ -132,6 +132,19 @@ impl Class {
 
         self
     }
+
+    pub fn populate_from_file(&mut self, file: &File) -> Vec<syn::Error> {
+        let mut warnings = vec![];
+
+        if let Err(e) = self.add_builder_from_file(file) {
+            warnings.push(e);
+        }
+        if let Err(e) = self.add_signals_from_file(file) {
+            warnings.push(e);
+        }
+
+        warnings
+    }
 }
 
 impl TryFrom<File> for Class {
@@ -226,12 +239,6 @@ impl TryFrom<File> for Class {
             inherits,
             constructible: false
         };
-
-        let _ = class
-            .add_builder_from_file(&file);
-
-        let _ = class
-            .add_signals_from_file(&file);
 
         Ok(class)
     }
