@@ -1,9 +1,8 @@
-use gtk::glib::{MainContext, PRIORITY_DEFAULT, timeout_future_seconds};
+use gtk::glib::{MainContext, timeout_future_seconds};
 use ::ousia::{*, prelude::{*}};
 use gtk::prelude::*;
 use gtk::Widget;
 use rxrust::prelude::*;
-use ::ousia::prelude::ToLocalGlib;
 
 pub fn asynchronous() -> impl IsA<Widget> {
     Box! {
@@ -14,9 +13,10 @@ pub fn asynchronous() -> impl IsA<Widget> {
 }
 
 fn wait_button() -> impl IsA<Widget> {
-    let shared_state = SharedBehaviorSubject::new(0);
-    let state = shared_state.clone().into_shared()
-        .glib_context_local(PRIORITY_DEFAULT);
+    let scheduler = GlibScheduler::default();
+    let shared_state = Shared::behavior_subject(0);
+    let state = shared_state.clone()
+        .observe_on(scheduler);
 
     let run = move || {
         let state = shared_state.clone();

@@ -1,7 +1,8 @@
-use quote::__private::TokenStream;
+use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
-use syn::{Attribute, FnArg, Ident, ImplItemMethod, Type, TypeParamBound};
+use syn::{Attribute, FnArg, Ident, ImplItemFn, Type, TypeParamBound};
 use syn::spanned::Spanned;
+use crate::attribute::AttributeExtension;
 
 #[derive(Debug, Clone)]
 pub struct Property {
@@ -15,7 +16,10 @@ impl Property {
         let name = format_ident!("{}", &self.name);
         let ty = &self.ty;
         let property_name = &self.name;
-        let attrs = &self.attrs;
+        let attrs = &self.attrs
+            .iter()
+            .filter(|attr| attr.is_not_synonymous_doc_to_item(property_name))
+            .collect::<Vec<_>>();
 
         fn unpack_ty(ty: &Type) -> (TokenStream, TokenStream) {
             match ty {
@@ -61,10 +65,10 @@ impl Property {
     }
 }
 
-impl TryFrom<&ImplItemMethod> for Property {
+impl TryFrom<&ImplItemFn> for Property {
     type Error = syn::Error;
 
-    fn try_from(f: &ImplItemMethod) -> Result<Self, syn::Error> {
+    fn try_from(f: &ImplItemFn) -> Result<Self, syn::Error> {
         Ok(Property {
             name: f.sig.ident.to_string(),
             ty: *f.sig.inputs.iter()
@@ -85,12 +89,16 @@ impl ToTokens for Property {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let name = format_ident!("{}", &self.name);
         let ty = &self.ty;
-        let attrs = &self.attrs;
+        let attrs = &self.attrs.iter()
+            .filter(|attr| attr.is_not_synonymous_doc_to_item(&self.name))
+            .collect::<Vec<_>>();
 
         *tokens = quote! {
             #( #attrs )*
             pub fn #name(&mut self, value: #ty) -> &mut Self {
-                self.builder = std::mem::take(&mut self.builder).#name(value);
+                self.builder = Some(
+                    self.builder.take().unwrap().#name(value)
+                );
                 self
             }
         };

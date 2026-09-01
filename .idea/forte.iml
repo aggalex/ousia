@@ -11,8 +11,38 @@
       <sourceFolder url="file://$MODULE_DIR$/ousia_macros/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/ousia_macros/tests" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/example/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gdk4-macos/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gdk4-macos/sys/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gdk4-macos/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gdk4-wayland/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gdk4-wayland/sys/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gdk4-wayland/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gdk4-win32/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gdk4-win32/sys/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gdk4-win32/sys/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gdk4-win32/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gdk4-x11/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gdk4-x11/sys/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gdk4-x11/sys/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gdk4-x11/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gdk4/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gdk4/sys/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gdk4/sys/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gdk4/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gsk4/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gsk4/sys/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gsk4/sys/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gsk4/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gtk4-macros/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gtk4-macros/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gtk4/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gtk4/sys/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gtk4/sys/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/generation/gtk4-rs/gtk4/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/prelude/target" />
+      <excludeFolder url="file://$MODULE_DIR$/generation/gtk4-rs/target" />
+      <excludeFolder url="file://$MODULE_DIR$/generation/target" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

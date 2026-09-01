@@ -1,7 +1,8 @@
-use quote::__private::TokenStream;
+use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::{Attribute, GenericParam, Ident, ImplItemMethod, PathArguments, ReturnType, Type, TypeParamBound};
+use syn::{Attribute, GenericParam, Ident, ImplItemFn, PathArguments, ReturnType, TraitItemFn, Type, TypeParamBound};
 use syn::spanned::Spanned;
+use crate::attribute::AttributeExtension;
 
 #[derive(Clone, Debug)]
 pub struct Signal {
@@ -19,8 +20,12 @@ impl Signal {
         let ty = &self.args;
         let connector = format_ident!("connect_{}", name);
         let ret = &self.ret;
-        let attrs = &self.attrs;
+        let attrs = &self.attrs.iter()
+            .filter(|attr| attr.is_not_synonymous_doc_to_item(&self.name))
+            .collect::<Vec<_>>();
         let fn_bound = format_ident!("{}", self.fn_bound);
+
+        eprintln!("name = {name:#?}, ret = {ret:#?}");
 
         quote! {
             #( #attrs )*
@@ -32,10 +37,10 @@ impl Signal {
     }
 }
 
-impl TryFrom<&ImplItemMethod> for Signal {
+impl TryFrom<&TraitItemFn> for Signal {
     type Error = syn::Error;
 
-    fn try_from(item: &ImplItemMethod) -> Result<Self, Self::Error> {
+    fn try_from(item: &TraitItemFn) -> Result<Self, Self::Error> {
         let mut name = item.sig.ident.to_string();
         if !name.starts_with("connect_") {
             return Err(syn::Error::new(item.sig.ident.span(), "Not a signal"));
@@ -78,7 +83,7 @@ impl TryFrom<&ImplItemMethod> for Signal {
         let args = ang.inputs
             .iter()
             .skip(1)
-            .cloned()
+            .map(|arg| arg.ty.clone())
             .collect();
 
         let ret = ang.output.clone();

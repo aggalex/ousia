@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use quote::__private::{TokenStream};
+use quote::__private::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use syn::{Attribute, File, Item};
+use syn::spanned::Spanned;
+use crate::attribute::AttributeExtension;
 
 struct Submodule {
     path: PathBuf,
@@ -22,7 +24,10 @@ impl ToTokens for Submodule {
         }
 
         let ident = format_ident!("{}", filename);
-        let attrs = &self.attributes;
+        let attrs = &self.attributes
+            .iter()
+            .filter(|attr| attr.is_not_synonymous_doc_to_item(filename))
+            .collect::<Vec<_>>();
 
         *tokens = quote! {
             #( #attrs )*
@@ -83,3 +88,4 @@ impl ToTokens for Module {
         };
     }
 }
+

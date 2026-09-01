@@ -1,10 +1,13 @@
-use std::collections::HashMap;
+use crate::attribute::Map;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
-use quote::__private::{Ident, Punct, Spacing, TokenStream, TokenTree};
+use diesel::dsl::Set;
+use proc_macro2::{Ident, TokenStream, TokenTree};
 use quote::{format_ident, quote, ToTokens};
-use syn::{Attribute, File, GenericArgument, ImplItem, Item, ItemUse, PathArguments, Type, UseTree};
-use syn::ReturnType::Default;
+use syn::{parse_quote, Attribute, File, ImplItem, Item, ItemUse, TraitItem, Type, UseTree};
 use syn::spanned::Spanned;
+use log::info;
+use crate::attribute::{AttributeExtension, FeatureTag, Tagged};
 use crate::prop::Property;
 use crate::signal::Signal;
 
@@ -12,8 +15,8 @@ const ALLOWED_IMPORTS: &[&str] = &["crate", "glib", "gio"];
 
 #[derive(Debug, Clone)]
 pub struct GtkImport {
-    tree: UseTree,
-    attrs: Vec<Attribute>
+    pub tree: UseTree,
+    pub attrs: Vec<Attribute>
 }
 
 impl TryFrom<&ItemUse> for GtkImport {
@@ -49,10 +52,11 @@ impl ToTokens for GtkImport {
 #[derive(Debug, Clone)]
 pub struct Class {
     pub name: String,
-    pub setters: HashMap<String, Property>,
+    pub setters: HashMap<String, Tagged<Property>>,
     pub used: Vec<GtkImport>,
-    pub signals: HashMap<String, Signal>,
-    pub inherits: Vec<String>,
+    pub signals: HashMap<String, Tagged<Signal>>,
+    // Class @extends and @implements can change per feature tag
+    pub inherits: HashMap<Vec<FeatureTag>, Vec<String>>,
     pub constructible: bool
 }
 
@@ -76,12 +80,12 @@ impl Class {
             .items
             .iter()
             .filter_map(|item| match item {
-                ImplItem::Method(f) => Some(f),
+                ImplItem::Fn(f) => Some(f),
                 _ => None
             })
             .filter(|f| !EXCLUDED.contains(&&*f.sig.ident.to_string()))
             .filter_map(|f| Property::try_from(f).ok())
-            .map(|prop| (prop.name.to_string(), prop));
+            .map(|prop| (prop.name.to_string(), Tagged::new(Vec::new(), prop)));
 
         self.constructible = true;
         self.setters.extend(setter_iter);
@@ -92,22 +96,19 @@ impl Class {
     pub fn add_signals_from_file(&mut self, file: &File) -> Result<&mut Self, syn::Error> {
         let signal_iter = file.items.iter()
             .filter_map(|item| match item {
-                Item::Impl(item) => Some(item),
+                Item::Trait(item) => Some(item),
                 _ => None
             })
-            .filter(|item| item.trait_.as_ref()
-                .and_then(|item| item.1.segments.last())
-                .map(|seg| seg.ident.to_string().ends_with("Ext"))
-                .unwrap_or(false))
+            .filter(|item| item.ident.to_string().ends_with("Ext"))
             .flat_map(|item| &item.items)
             .filter_map(|item| match item {
-                ImplItem::Method(m) => Some(m),
+                TraitItem::Fn(m) => Some(m),
                 _ => None
             })
             .filter(|m| m.sig.ident.to_string().starts_with("connect_"))
             .map(Signal::try_from)
             .map(|sig|
-                sig.map(|sig| (sig.name.clone(), sig))
+                sig.map(|sig| (sig.name.clone(), Tagged::new(Vec::new(), sig)))
             )
             .collect::<Result<HashMap<_, _>, _>>()?;
 
@@ -116,13 +117,19 @@ impl Class {
         Ok(self)
     }
 
-    pub fn add_props_from_class(&mut self, class: &Class) -> &mut Self {
-        self.setters.extend(class.setters.clone());
+    pub fn add_props_from_class(&mut self, class: &Class, feature_tag: &[FeatureTag]) -> &mut Self {
+        self.setters.extend(class.setters
+            .iter()
+            .map(|(name, prop)| (name.clone(), Tagged::new(Vec::from(feature_tag), prop.item.clone()))));
+
         self
     }
 
-    pub fn add_signals_from_class(&mut self, class: &Class) -> &mut Self {
-        self.signals.extend(class.signals.clone());
+    pub fn add_signals_from_class(&mut self, class: &Class, feature_tag: &[FeatureTag]) -> &mut Self {
+        self.signals.extend(class.signals
+            .iter()
+            .map(|(name, prop)| (name.clone(), Tagged::new(Vec::from(feature_tag), prop.item.clone()))));
+
         self
     }
 }
@@ -133,7 +140,7 @@ impl TryFrom<File> for Class {
     fn try_from(file: File) -> Result<Class, syn::Error> {
         let mut last_token: String = "".to_string();
 
-        let mac = file.items.iter()
+        let definitions = file.items.iter()
             .filter_map(|item| match item {
                 Item::Macro(mac) => Some(mac),
                 _ => None
@@ -143,43 +150,61 @@ impl TryFrom<File> for Class {
                     .last()
                     .map(|name| name.ident.to_string() == "wrapper")
                     .unwrap_or(false)
-            })
-            .next()
-            .ok_or(syn::Error::new(file.span(), "No declaration of gobject class found"))?;
+            }).map(|mac| -> syn::Result<_> {
 
-        let mut iter = mac
-            .mac.tokens.clone().into_iter()
-            .take_while(|token| match token {
-                TokenTree::Punct(p) => p.as_char() != ';',
-                _ => true
-            })
-            .filter_map(|token| match token {
-                TokenTree::Ident(ident) => Some(ident.to_string()),
-                _ => None
-            });
+            let mut iter = mac
+                .mac.tokens.clone().into_iter()
+                .take_while(|token| match token {
+                    TokenTree::Punct(p) => p.as_char() != ';',
+                    _ => true
+                })
+                .filter_map(|token| match token {
+                    TokenTree::Ident(ident) => Some(ident.to_string()),
+                    _ => None
+                });
 
-        // automata to find name of struct
-        let name = loop {
-            let token = iter.next().ok_or(syn::Error::new(mac.span(), "no struct declaration found in glib::wrapper!"))?;
-            last_token = match (&*last_token, &*token) {
-                (_, "pub") => token,
-                ("pub", "struct") => token,
-                ("struct", _) => {
-                    break token
-                },
-                _ => "".to_string()
-            }
-        };
+            // automata to find name of struct
+            let name = loop {
+                let token = iter.next().ok_or(syn::Error::new(mac.span(), "no struct declaration found in glib::wrapper!"))?;
+                last_token = match (&*last_token, &*token) {
+                    (_, "pub") => token,
+                    ("pub", "struct") => token,
+                    ("struct", _) => {
+                        break token
+                    },
+                    _ => "".to_string()
+                }
+            };
 
-        const PARENT_TOKENS: &'static [&'static str] = &[
-            "implements",
-            "extends"
-        ];
+            const PARENT_TOKENS: &'static [&'static str] = &[
+                "implements",
+                "extends"
+            ];
 
-        let inherits = iter
-            .skip_while(|token| !PARENT_TOKENS.contains(&&**token))
-            .filter(|token| !PARENT_TOKENS.contains(&&**token))
-            .collect();
+            let inherits = iter
+                .skip_while(|token| !PARENT_TOKENS.contains(&&**token))
+                .filter(|token| !PARENT_TOKENS.contains(&&**token))
+                .collect();
+
+            let feat: Vec<FeatureTag> = mac.attrs.iter()
+                .filter_map(|cls| FeatureTag::try_from(cls).ok())
+                .collect();
+
+            Ok((name, (feat, inherits)))
+        })
+            .collect::<syn::Result<Vec<(String, (Vec<FeatureTag>, Vec<String>))>>>()?;
+
+        let names = definitions.iter()
+            .map(|(name, _)| name)
+            .collect::<HashSet<_>>();
+
+        if names.len() > 1 {
+            return Err(syn::Error::new(file.span(), "Differently named definitions in file"));
+        }
+
+        let name = names.iter().next()
+            .ok_or(syn::Error::new(file.span(), "No declaration of gobject class found"))?
+            .to_string();
 
         let used = file.items.iter()
             .filter_map(|item| match item {
@@ -189,6 +214,10 @@ impl TryFrom<File> for Class {
             .filter_map(|item| GtkImport::try_from(item).ok())
             .collect();
 
+        let inherits = definitions.into_iter()
+            .map(|(name, defs)| defs)
+            .collect::<HashMap<_, _>>();
+
         let mut class = Class {
             name,
             used,
@@ -197,10 +226,6 @@ impl TryFrom<File> for Class {
             inherits,
             constructible: false
         };
-
-        if &class.name == "Button" {
-            println!("Button inherits: {:?}", class.inherits);
-        }
 
         let _ = class
             .add_builder_from_file(&file);
@@ -237,20 +262,20 @@ impl Class {
             .collect::<Vec<_>>();
 
         let binders = self.setters.values()
-            .map(|prop| prop.bind_method(&builder_name))
+            .map(|prop| prop.map(|prop| prop.bind_method(&builder_name)))
             .collect::<Vec<_>>();
 
         let signals = self.signals.values()
-            .map(|sig| sig.to_token_stream(
+            .map(|sig| sig.map(|sig| sig.to_token_stream(
                 &name,
                 &builder_name
-            ))
+            )))
             .collect::<Vec<_>>();
 
         quote! {
             #[derive(Default)]
             pub struct #builder_name {
-                builder: gtkrs::builders::#builder_name,
+                builder: Option<gtkrs::builders::#builder_name>,
                 on_build: Vec<std::boxed::Box<dyn FnOnce(&gtkrs::#name) + 'static>>,
                 object: Option<gtkrs::#name>
             }
@@ -285,7 +310,8 @@ impl Class {
                     func(self.create());
                 }
                 fn create(&mut self) -> Self::Target {
-                    let obj = std::mem::take(&mut self.builder).build();
+                    let mut builder = self.builder.take().unwrap();
+                    let obj = builder.build();
                     std::mem::take(&mut self.on_build).into_iter()
                         .for_each(|f| f(&obj));
                     obj
@@ -308,7 +334,7 @@ impl Class {
                 #( #signals )*
             }
 
-            impl ForteExt for #name {
+            impl OusiaExt for #name {
                 type Builder = #builder_name;
             }
         }
@@ -336,7 +362,7 @@ impl ToTokens for Class {
             #![allow(dead_code, unused_imports)]
 
             #( #uses )*
-            use gtkrs::{ *, #name, prelude::*, traits::* };
+            use gtkrs::{ *, #name, prelude::* };
             use crate::prelude::*;
             use rxrust::prelude::*;
 

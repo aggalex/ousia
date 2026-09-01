@@ -14,7 +14,7 @@ fn main() {
 
     println!("cargo:note=Generating module ousia",);
 
-    let ungenerated = Generator {
+    let context = Generator {
         target,
         source_crate: PathBuf::from(option_env!("SOURCE_CRATE")
             .unwrap_or("../generation/gtk4-rs/gtk4")),
@@ -24,9 +24,11 @@ fn main() {
     }
         .parse()
         .unwrap()
-        .populate()
-        .generate()
-        .unwrap();
+        .populate();
+
+    let ungenerated = context.not_generated.clone();
+
+    context.generate().unwrap();
 
     if ungenerated.len() != 0 {
         println!("cargo:warning=Failed to generate bindings for {len} files: {files}",

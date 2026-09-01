@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
-use quote::__private::TokenStream;
+use proc_macro2::TokenStream;
 use quote::ToTokens;
 use rust_format::{Formatter, RustFmt};
-use syn::{File, Pat};
+use syn::File;
 use crate::class::Class;
 use crate::module::Module;
 
@@ -41,17 +41,32 @@ pub struct Context {
 }
 
 impl Context {
+    pub fn new(
+        generator: Generator,
+        module: (PathBuf, File),
+        classes: Vec<(PathBuf, Class)>,
+    ) -> Self {
+        Context {
+            generator,
+            module,
+            classes,
+            not_generated: vec![],
+        }
+    }
+
     pub fn populate(mut self) -> Self {
         self.classes = self.classes.iter()
             .cloned()
             .map(|(path, mut cls)| {
-                for (_, parent) in cls.inherits.iter()
-                    .filter_map(|p| self.classes.iter()
-                        .find(|(_, cls)| &cls.name == p))
-                    .collect::<Vec<_>>()
-                {
-                    cls.add_signals_from_class(parent);
-                }
+                let parents = cls.inherits.iter()
+                    .filter_map(|(feat, inherits)| self.classes.iter()
+                        .find(|(_, cls)| inherits.contains(&cls.name))
+                        .map(|(_, cls)| (feat.clone(), cls.clone())))
+                    .collect::<Vec<_>>();
+
+                for (feat, parent) in parents {
+                    cls.add_signals_from_class(&parent, &feat);
+                };
 
                 (path, cls)
             })
@@ -92,7 +107,7 @@ impl Generator {
         src.push("src");
         src.push("auto");
 
-        let files = std::fs::read_dir(&src).unwrap();
+        let files = std::fs::read_dir(&src).expect("Missing GTK4-rs submodule");
 
         let mut ungenerated = vec![];
 

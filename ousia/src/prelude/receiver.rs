@@ -1,60 +1,51 @@
-use gtkrs::glib::{Continue, MainContext, Priority, PRIORITY_DEFAULT, Sender};
+use std::future::Future;
+use std::pin::Pin;
+use gtkrs::glib;
+use gtkrs::glib::{MainContext, Priority};
 use rxrust::prelude::*;
 
-pub trait ToLocalGlib<N, E> {
-
-    fn glib_context_local(self, priority: Priority) -> LocalSubject<'static, N, E>;
+#[derive(Clone)]
+pub struct GlibScheduler {
+    context: MainContext,
+    priority: Priority,
 }
 
-static ERR_MSG: &'static str = "Unable to send to main context";
-
-struct GLibSenderObserver<Item, Error> (pub Sender<Option<Result<Item, Error>>>);
-
-impl<Item, Error> Observer for GLibSenderObserver<Item, Error> {
-    type Item = Item;
-    type Err = Error;
-
-    fn next(&mut self, value: Self::Item) {
-        self.0.send(Some(Ok(value))).expect(ERR_MSG)
-    }
-
-    fn error(&mut self, err: Self::Err) {
-        self.0.send(Some(Err(err))).expect(ERR_MSG)
-    }
-
-    fn complete(&mut self) {
-        self.0.send(None).expect(ERR_MSG)
+impl Default for GlibScheduler {
+    fn default() -> GlibScheduler {
+        GlibScheduler::new(MainContext::default(), Priority::DEFAULT)
     }
 }
 
-unsafe impl<Item, Error> Send for GLibSenderObserver<Item, Error> {}
-unsafe impl<Item, Error> Sync for GLibSenderObserver<Item, Error> {}
+impl GlibScheduler {
+    pub fn new(context: MainContext, priority: Priority) -> Self {
+        Self { context, priority }
+    }
+}
 
-impl<S, N: Clone + 'static, E: Clone + 'static> ToLocalGlib<N, E> for Shared<S>
-    where S: SharedObservable<Item = N, Err = E>
+impl SleepProvider for GlibScheduler {
+    type SleepFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
+
+    fn sleep(&self, duration: Duration) -> Self::SleepFuture {
+        glib::timeout_future(duration)
+    }
+}
+
+impl<S> Scheduler<S> for GlibScheduler
+    where
+        S: Schedulable<Self> + Send + 'static,
+        S::Future: Send + 'static,
 {
-    fn glib_context_local(self, priority: Priority) -> LocalSubject<'static, N, E> {
-        let (sender, receiver) = MainContext::channel(priority);
-
-        let out = LocalSubject::new();
-
-        self.actual_subscribe(GLibSenderObserver(sender));
-
-        let mut receiver_subject = out.clone();
-
-        receiver.attach(
-            None,
-            move |value| {
-                let out = Continue(value.is_some());
-                match value {
-                    Some(Ok(value)) => receiver_subject.next(value),
-                    Some(Err(err)) => receiver_subject.error(err),
-                    None => receiver_subject.complete()
-                }
-                out
+    fn schedule(&self, source: S, delay: Option<Duration>) -> TaskHandle {
+        let context = self.context.clone();
+        let priority = self.priority;
+        let future = source.into_future(self);
+        let task = async move {
+            if let Some(d) = delay {
+                glib::timeout_future(d).await;
             }
-        );
-
-        out
+            future.await;
+        };
+        context.spawn_with_priority(priority, task);
+        TaskHandle::finished()
     }
 }

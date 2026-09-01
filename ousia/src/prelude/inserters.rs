@@ -1,4 +1,3 @@
-use gtkrs::glib::IsA;
 use gtkrs::prelude::*;
 use gtkrs::Widget;
 

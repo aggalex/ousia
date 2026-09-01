@@ -43,7 +43,7 @@ fn test_box() {
 #[test]
 fn test_generate() {
     let ungenerated = Generator {
-        included: Some(vec!["application.rs", "application_window.rs", "box_.rs", "button.rs", "label.rs"]),
+        included: Some(vec!["application.rs", "application_window.rs", "gl_area.rs", "box_.rs", "button.rs", "label.rs"]),
         ..Generator::default()
     }
         .parse()

@@ -5,7 +5,7 @@ pub trait Builder: Default {
     fn create(&mut self) -> Self::Target;
 }
 
-pub trait ForteExt {
+pub trait OusiaExt {
     type Builder: Builder<Target = Self> + Sized;
 
     fn ousia() -> Self::Builder {

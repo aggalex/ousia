@@ -1,39 +1,60 @@
 use std::cell::RefCell;
+use std::convert::Infallible;
 use std::marker::PhantomData;
-use gtkrs::glib::{IsA, Object, ObjectExt, ObjectType, ToValue};
-use gtkrs::prelude::WidgetExt;
-use gtkrs::{Application, glib, Widget};
-use gtkrs::pango::Item;
-use gtkrs::SortColumn::Default;
+use gtkrs::glib::Object;
+use gtkrs::glib::prelude::{IsA, ObjectExt, ToValue};
+use rxrust::observer::Observer;
 use rxrust::observable::Observable;
-use rxrust::prelude::{BehaviorSubject, LocalBehaviorSubject, LocalObservable, Observer, SubscribeNext, SubscriptionLike};
-use rxrust::shared::SharedObservable;
+use rxrust::prelude::*;
 
 pub trait Cleanup: gtkrs::prelude::ObjectType {
     fn cleanup(&self, f: impl Fn() + 'static);
 }
 
 pub trait Handler<T>: Clone {
-    fn handle(&self, obj: &(impl IsA<glib::Object> + Cleanup), prop: &str);
+    fn handle(&self, obj: &(impl IsA<Object> + Cleanup), prop: &str);
+}
+
+struct PropertySetter<N> {
+    obj: Object,
+    prop: String,
+    _marker: PhantomData<fn(N)>,
+}
+
+impl<N: ToValue> Observer<N, Infallible> for PropertySetter<N> {
+    fn next(&mut self, value: N) {
+        self.obj.set_property(&self.prop, &value);
+    }
+
+    fn error(self, _err: Infallible) {}
+
+    fn complete(self) {}
+
+    fn is_closed(&self) -> bool {
+        false
+    }
 }
 
 impl<T, S> Handler<T> for S
     where
-        S: LocalObservable<'static, Err = (), Item = T> + Clone + 'static,
-        T: ToValue + 'static
+        S: Observable + Clone + 'static,
+        T: ToValue + 'static,
+        for<'a> S::Item<'a>: ToValue,
+        for<'a> S::Inner: CoreObservable<S::With<PropertySetter<S::Item<'a>>>>,
 {
-    fn handle(&self, obj: &(impl IsA<glib::Object> + Cleanup), prop: &str) {
-        let obj_clone = obj.clone();
+    fn handle(&self, obj: &(impl IsA<Object> + Cleanup), prop: &str) {
+        let obj_clone: Object = obj.clone().into();
         let prop = prop.to_string();
-        let sub = self.clone().subscribe(move |value|
-            obj_clone.set_property(&prop, value)
-        );
-        let sub = RefCell::new(Some(sub));
+        let sub = RefCell::new(Some(
+            self.clone().subscribe_with(PropertySetter {
+                obj: obj_clone,
+                prop,
+                _marker: PhantomData,
+            })
+        ));
         obj.cleanup(move || {
-            let mut sub = sub.borrow_mut();
-            if let Some(s) = &mut *sub {
+            if let Some(s) = sub.borrow_mut().take() {
                 s.unsubscribe();
-                *sub = None;
             }
         });
     }
