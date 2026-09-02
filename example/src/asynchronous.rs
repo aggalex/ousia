@@ -14,7 +14,7 @@ pub fn asynchronous() -> impl IsA<Widget> {
 }
 
 fn wait_button() -> impl IsA<Widget> {
-    let state = Local::behavior_subject(0).r#use();
+    let state = State::from(0).r#use();
 
     let run = {
         let state = state().r#use();
@@ -29,11 +29,11 @@ fn wait_button() -> impl IsA<Widget> {
 
     Button! {
         hexpand: true,
-        #label: &state().map(|value| match value {
+        #label: &state().observe().map(|value| match value {
             0 => "Wait for 6s".to_string(),
             n => format!("t - {}s", n)
         }),
-        #sensitive: &state().map(|value| value == 0),
+        #sensitive: &state().observe().map(|value| value == 0),
         @clicked: move |_| { run(); }
     }
 }

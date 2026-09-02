@@ -4,11 +4,24 @@ use rxrust::prelude::*;
 use ::ousia::{*, prelude::*};
 
 pub fn counter() -> impl IsA<Widget> {
-    let state = Local::behavior_subject(0).r#use();
+    let state = State::from(0i32).r#use();
 
     let string_memo = state()
-        .map(|value| value.to_string())
-        .r#use();
+        .observe()
+        .map(|value| format!("{}", value));
+
+    let add = |i: i32| {
+        let state = state.clone();
+        move || state().next_by(|value| value + i)
+    };
+
+    let up = add(1);
+    let down = add(-1);
+
+    let reset = {
+        let state = state.clone();
+        move || state().next(0)
+    };
 
     Box! {
         orientation: gtk::Orientation::Vertical,
@@ -19,13 +32,25 @@ pub fn counter() -> impl IsA<Widget> {
         margin_bottom: 12,
         append: &Label! {
             vexpand: true,
-            #label: &string_memo()
+            #label: &string_memo
         },
-        append: &Button! {
-            label: "+1",
-            vexpand: true,
-            @clicked: move |_| {
-                state().next_by(|value| value + 1);
+        append: &Box! {
+            orientation: gtk::Orientation::Horizontal,
+            spacing: 6,
+            append: &Button! {
+                label: "-1",
+                vexpand: true,
+                @clicked: move |_| down()
+            },
+            append: &Button! {
+                label: "+1",
+                vexpand: true,
+                @clicked: move |_| up()
+            },
+            append: &Button! {
+                label: "Reset",
+                vexpand: true,
+                @clicked: move |_| reset()
             }
         }
     }
