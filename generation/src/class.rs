@@ -380,7 +380,6 @@ impl ToTokens for Class {
             #( #uses )*
             use gtkrs::{ *, #name, prelude::* };
             use crate::prelude::*;
-            use rxrust::prelude::*;
 
             #builder
 

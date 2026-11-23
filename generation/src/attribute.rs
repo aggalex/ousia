@@ -187,7 +187,7 @@ impl FeatureTag {
         match self {
             FeatureTag::Tag {..} => self,
             FeatureTag::Not(x) => match *x {
-                FeatureTag::Not(box y) => y.simplify(),
+                FeatureTag::Not(y) => y.simplify(),
                 x => FeatureTag::Not(Box::new(x.simplify()))
             },
             FeatureTag::All(x) => {
@@ -208,7 +208,7 @@ impl FeatureTag {
                     if excluded.contains(&i) {
                         continue;
                     }
-                    if let FeatureTag::Not(box y) = item {
+                    if let FeatureTag::Not(y) = item {
                         let similar = simplified.iter().enumerate().find(|(_, x)| (*x).eq(y));
                         if let Some((j, x)) = similar {
                             excluded.insert(i);

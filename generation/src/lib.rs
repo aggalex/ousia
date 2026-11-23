@@ -1,5 +1,3 @@
-#![feature(box_patterns)]
-
 #[cfg(test)]
 mod tests;
 pub mod class;
@@ -9,6 +7,7 @@ pub mod module;
 pub mod signal;
 pub mod attribute;
 pub mod diagnostics;
+mod alias;
 
 extern crate syn;
 extern crate quote;

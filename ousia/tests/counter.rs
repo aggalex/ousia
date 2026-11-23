@@ -2,7 +2,6 @@ use gtkrs::prelude::*;
 use ::ousia::prelude::*;
 use ::ousia::*;
 use gtkrs::glib;
-use rxrust::prelude::*;
 
 fn main() {
     // Create a new application
@@ -16,7 +15,7 @@ fn main() {
 }
 
 fn build_ui(app: &gtkrs::Application) {
-    let state = Local::behavior_subject(0);
+    let state = State::new(0);
 
     let window = ApplicationWindow! {
         application: app,
@@ -34,7 +33,7 @@ fn build_ui(app: &gtkrs::Application) {
                 @clicked: glib::clone!(
                     #[strong] state,
                     move |_| {
-                        state.clone().next_by(|v| v + 1);
+                        state.clone().update(|v| v + 1);
                     },
                 )
             }

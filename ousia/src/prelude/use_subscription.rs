@@ -1,16 +1,12 @@
-use std::cell::RefCell;
-use std::marker::PhantomData;
-use std::rc::Rc;
-use delegate::delegate;
+use std::fmt::Display;
+use std::sync::{Weak, Arc, Mutex, PoisonError};
+use gtkrs::glib;
 use gtkrs::glib::Object;
-use gtkrs::glib::prelude::{IsA, ObjectExt, ToValue};
-use gtkrs::glib::property::PropertySet;
-use rxrust::observer::Observer;
-use rxrust::observable::Observable;
-use rxrust::ops::Map;
-use rxrust::prelude::*;
+use gtkrs::glib::clone::Downgrade;
+use gtkrs::glib::prelude::{IsA};
+use gtkrs::prelude::{Cast, FileExt, ObjectExt, ObjectType, ToValue, TreeModelExtManual};
 
-pub trait Cleanup: gtkrs::prelude::ObjectType {
+pub trait Cleanup: ObjectType {
     fn cleanup(&self, f: impl Fn() + 'static);
 }
 
@@ -18,138 +14,148 @@ pub trait Handler: Clone {
     fn handle(&self, obj: &(impl IsA<Object> + Cleanup), prop: &str);
 }
 
-pub trait HandlerOf<T>: Handler + Observable<Item<'static> = T> where Self: 'static {}
+pub trait HandlerOf<T>: Handler where Self: 'static {
 
-impl<T, O: Handler + Observable<Item<'static> = T> + 'static> HandlerOf<T> for O {}
-
-struct PropertySetter<N> {
-    obj: Object,
-    prop: String,
-    _marker: PhantomData<fn(N)>,
 }
 
-impl<N: ToValue> Observer<N, ()> for PropertySetter<N> {
-    fn next(&mut self, value: N) {
-        self.obj.set_property(&self.prop, &value);
+mod imp {
+    use std::cell::{Cell, RefCell};
+    use gtkrs::glib;
+    use gtkrs::glib::{Properties, Variant};
+    use gtkrs::subclass::prelude::*;
+    use gtkrs::glib::object::ObjectExt;
+
+    #[derive(Properties, Default)]
+    #[properties(wrapper_type = super::ValueNotifier)]
+    pub(super) struct ValueNotifier {
+        #[property(get, set)]
+        value: Cell<bool>,
     }
 
-    fn error(self, _err: ()) {}
-
-    fn complete(self) {}
-
-    fn is_closed(&self) -> bool {
-        false
+    #[glib::object_subclass]
+    impl ObjectSubclass for ValueNotifier {
+        const NAME: &'static str = "ValueDelegate";
+        type Type = super::ValueNotifier;
+        type ParentType = glib::Object;
     }
-}
 
-impl<S> Handler for S
-    where
-        S: Observable + Clone + 'static,
-        for<'a> S::Item<'a>: ToValue,
-        for<'a> S::Inner: CoreObservable<S::With<PropertySetter<S::Item<'a>>>>,
-{
-    fn handle(&self, obj: &(impl IsA<Object> + Cleanup), prop: &str) {
-        let obj_clone: Object = obj.clone().into();
-        let prop = prop.to_string();
-        let sub = RefCell::new(Some(
-            self.clone().subscribe_with(PropertySetter {
-                obj: obj_clone,
-                prop,
-                _marker: PhantomData,
-            })
-        ));
-        obj.cleanup(move || {
-            if let Some(s) = sub.borrow_mut().take() {
-                s.unsubscribe();
-            }
-        });
+    #[glib::derived_properties]
+    impl ObjectImpl for ValueNotifier {
+
     }
 }
 
-pub trait Hook {
-    fn r#use(self) -> impl Clone + Fn() -> Self;
+glib::wrapper! {
+    pub(self) struct ValueNotifier(ObjectSubclass<imp::ValueNotifier>);
 }
 
-impl<O: Clone + 'static> Hook for O {
+impl ValueNotifier {
+    pub fn new() -> ValueNotifier {
+        Object::builder().build()
+    }
 
-    fn r#use(self) -> impl Clone + Fn() -> Self {
-        move || self.clone()
+    pub fn notify(&self) {
+        self.notify_value();
+    }
+
+    pub fn bind<'a, G: ToValue + 'static>(&'a self, obj: &'a impl ObjectType, prop: &'a str, get_value: impl (Fn() -> G) + Send + Sync + 'static) -> glib::object::BindingBuilder {
+        self.bind_property("value", obj, prop)
+            .transform_to(move |_, _: bool| Some(get_value().to_value()))
     }
 }
 
-pub trait ObservableTypes: Context {
-    type Subject<'a, T, Err> = Self::With<Subject<SubjectPtr<'a, Self, T, Err>>>
-    where Self: 'a;
-
-    type BehaviorSubject<'a, T: Clone, Err> = Self::With<BehaviorSubject<T, SubjectPtr<'a, Self, T, Err>>>
-    where Self: 'a;
+pub struct State<T> {
+    pub value: Arc<Mutex<T>>,
+    delegate: ValueNotifier,
 }
 
-impl ObservableTypes for Local<()> {
-
+struct WeakState<T> {
+    pub value: Weak<Mutex<T>>,
+    delegate: <ValueNotifier as Downgrade>::Weak,
 }
 
-#[derive(Clone)]
-pub struct State<T: Clone> {
-    pub subject: <Local<()> as ObservableTypes>::BehaviorSubject<'static, Rc<RefCell<T>>, ()>,
-}
-
-impl<T: Clone> From<T> for State<T> {
-    fn from(state: T) -> Self {
+impl<T: Clone + ToValue + 'static> State<T> {
+    pub fn new(value: T) -> Self {
         Self {
-            subject: Local::behavior_subject(Rc::new(RefCell::new(state))),
+            delegate: ValueNotifier::new(),
+            value: Arc::new(Mutex::new(value)),
         }
     }
-}
 
-// This is ugly, but at least it's a type alias
-pub type StateObservable<T: Clone + 'static> = LocalCtx<Map<
-    BehaviorSubject<Rc<RefCell<T>>,
-        MutRc<Subscribers<BoxedObserver<'static, Rc<RefCell<T>>, ()>>>
-    >, fn(Rc<RefCell<T>>) -> T>, LocalScheduler>;
-
-impl<T: ToValue + Clone + 'static> State<T> {
-    #[inline]
-    pub fn observe(&self) -> StateObservable<T> {
-        self.subject.clone()
-            .map(|subject| subject.borrow().clone())
-    }
-}
-
-impl<T: Clone> Observer<T, ()> for State<T> {
-    #[inline]
-    fn next(&mut self, value: T) {
-        let cell = self.subject.peek();
-        cell.set(value);
-        self.subject.next(cell);
-    }
-
-    delegate! {
-        to self.subject {
-            fn error(self, err: ());
-            fn complete(self);
-            fn is_closed(&self) -> bool;
-        }
-    }
-}
-
-impl<T: Clone> Behavior for State<T> {
-    type Item = T;
-
-    #[inline]
-    fn peek(&self) -> Self::Item {
-        self.subject
-            .peek()
-            .borrow()
+    pub fn get(&self) -> T {
+        self.value.lock()
+            .unwrap_or_else(PoisonError::into_inner)
             .clone()
     }
 
-    fn next_by(&mut self, f: impl FnOnce(Self::Item) -> Self::Item) {
-        self.subject
-            .next_by(|value| {
-                let new_value = f(value.borrow().clone());
-                value.set(new_value);
-                value
-            });
+    pub fn set(&self, value: T) {
+        {
+            let mut value_ref = self.value.lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            *value_ref = value;
+        }
+        self.delegate.notify();
     }
+
+    pub fn update(&self, value: impl FnOnce(T) -> T) {
+        self.set(value(self.get()));
+    }
+
+    pub fn map<G>(&self, f: impl Fn(T) -> G + Send + Sync + 'static) -> State<G>
+        where G: Clone + ToValue + 'static
+    {
+        let clonable_f = Arc::new(f);
+        let f = clonable_f.clone();
+        let new_value = f(self.get());
+        let new_state = State::new(new_value);
+        let new_state_clone = new_state.clone();
+        let self_weak = self.downgrade();
+        let f = clonable_f.clone();
+        self.delegate.connect_value_notify(move |_| {
+            let Some(this) = self_weak.upgrade() else { return };
+            let item = f(this.get());
+            new_state_clone.set(item);
+        });
+        new_state
+    }
+
+    fn downgrade(&self) -> WeakState<T> {
+        WeakState {
+            value: Arc::downgrade(&self.value),
+            delegate: Downgrade::downgrade(&self.delegate),
+        }
+    }
+}
+
+impl<T> WeakState<T> {
+    pub fn upgrade(&self) -> Option<State<T>> {
+        Some(State {
+            value: self.value.upgrade()?,
+            delegate: self.delegate.upgrade()?
+        })
+    }
+}
+
+impl<T: ToValue + 'static + Clone + Send> Handler for State<T> {
+    fn handle(&self, obj: &(impl IsA<Object> + Cleanup), prop: &str) {
+        let arc = self.value.clone();
+        self.delegate.bind(obj.as_ref(), prop, move || {
+            arc.lock().unwrap_or_else(PoisonError::into_inner).clone()
+        })
+            .sync_create()
+            .build();
+    }
+}
+
+impl<T> Clone for State<T> {
+    fn clone(&self) -> Self {
+        Self {
+            value: self.value.clone(),
+            delegate: self.delegate.clone(),
+        }
+    }
+}
+
+impl<T: ToValue + 'static + Clone + Send> HandlerOf<T> for State<T> {
+
 }

@@ -10,7 +10,6 @@ keywords = ["gtk"]
 
 [dependencies]
 gtkrs = { version = "0.11.4", package = "gtk4" }
-rxrust = { git = "https://github.com/rxRust/rxRust/" }
 delegate = "0.13.5"
 
 [build-dependencies]

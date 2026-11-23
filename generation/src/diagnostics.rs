@@ -46,6 +46,17 @@ impl Diagnostics {
         self.diagnostics.push(diagnostic);
     }
 
+    pub fn extend(&mut self, other: Diagnostics) {
+        self.diagnostics.extend(other.diagnostics);
+    }
+
+    pub fn extend_as(&mut self, other: Diagnostics, severity: Severity) {
+        for mut diagnostic in other.diagnostics {
+            diagnostic.severity = severity;
+            self.diagnostics.push(diagnostic);
+        }
+    }
+
     pub fn warning(&mut self, msg: impl Into<String>) {
         self.push(Diagnostic {
             severity: Severity::Warning,
@@ -94,8 +105,8 @@ impl Diagnostics {
     pub fn emit(&self) {
         for diag in &self.diagnostics {
             match diag.severity {
-                Severity::Warning => println!("cargo:warning={diag}"),
-                Severity::Error => println!("cargo:error={diag}"),
+                Severity::Warning => println!("cargo::warning={diag}"),
+                Severity::Error => println!("cargo::error={diag}"),
             }
         }
     }
@@ -112,5 +123,24 @@ impl Diagnostics {
 
     pub fn diagnostics(&self) -> &[Diagnostic] {
         &self.diagnostics
+    }
+}
+
+impl FromIterator<Diagnostic> for Diagnostics {
+    fn from_iter<I: IntoIterator<Item = Diagnostic>>(iter: I) -> Self {
+        Self {
+            diagnostics: iter.into_iter().collect()
+        }
+    }
+}
+
+impl FromIterator<Diagnostics> for Diagnostics {
+    fn from_iter<I: IntoIterator<Item = Diagnostics>>(iter: I) -> Self {
+        iter.into_iter()
+            .reduce(|mut a, b| {
+                a.extend(b);
+                a
+            })
+            .unwrap_or_else(Diagnostics::default)
     }
 }
