@@ -15,10 +15,10 @@ fn main() {
 }
 
 fn build_ui(app: &gtkrs::Application) {
-    let state = State::new(0);
-    let text = State::new("Hello World!".to_string());
+    let state = State::new(0).r#use();
+    let text = State::new("Hello World!".to_string()).r#use();
 
-    (&state, &text).use_effect(move |(state, text)| {
+    (&state(), &text()).use_effect(move |(state, text)| {
         println!("Count: {}", state);
     });
 
@@ -31,19 +31,19 @@ fn build_ui(app: &gtkrs::Application) {
             orientation: gtkrs::Orientation::Vertical,
             spacing: 6,
             append: &Label! {
-                #label: &(&state, &text).combine(|(state, text)| {
+                #label: &(&state(), &text()).combine(|(state, text)| {
                     format!("Count: {}, Message: {}", state, text)
                 })
             },
             append: &Entry! {
-                #text: &text.bidirectional()
+                #text: &text().bidirectional()
             },
             append: &Button! {
                 label: "+1",
                 @clicked: glib::clone!(
                     #[strong] state,
                     move |_| {
-                        state.clone().update(|v| v + 1);
+                        state().update(|v| v + 1);
                     },
                 )
             }

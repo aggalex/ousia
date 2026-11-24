@@ -4,15 +4,14 @@ use rxrust::prelude::*;
 use ::ousia::{*, prelude::*};
 
 pub fn counter() -> impl IsA<Widget> {
-    let state = State::from(0i32).r#use();
+    let state = State::new(0i32).r#use();
 
     let string_memo = state()
-        .observe()
         .map(|value| format!("{}", value));
 
     let add = |i: i32| {
         let state = state.clone();
-        move || state().next_by(|value| value + i)
+        move || state().update(|value| value + i)
     };
 
     let up = add(1);
@@ -20,7 +19,7 @@ pub fn counter() -> impl IsA<Widget> {
 
     let reset = {
         let state = state.clone();
-        move || state().next(0)
+        move || state().set(0)
     };
 
     Box! {
