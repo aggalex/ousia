@@ -1,25 +1,17 @@
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 use std::sync::{Weak, Arc, Mutex, PoisonError};
 use gtkrs::glib;
 use gtkrs::glib::Object;
 use gtkrs::glib::clone::Downgrade;
+use gtkrs::glib::object::BindingBuilder;
 use gtkrs::glib::prelude::{IsA};
 use gtkrs::prelude::{Cast, FileExt, ObjectExt, ObjectType, ToValue, TreeModelExtManual};
-
-pub trait Cleanup: ObjectType {
-    fn cleanup(&self, f: impl Fn() + 'static);
-}
-
-pub trait Handler: Clone {
-    fn handle(&self, obj: &(impl IsA<Object> + Cleanup), prop: &str);
-}
-
-pub trait HandlerOf<T>: Handler where Self: 'static {
-
-}
+use crate::prelude::binding::{Cleanup, Handler, HandlerOf};
+use crate::prelude::HandlerWithType;
 
 mod imp {
-    use std::cell::{Cell, RefCell};
+    use std::cell::{Cell};
+    use std::sync::atomic::AtomicBool;
     use gtkrs::glib;
     use gtkrs::glib::{Properties, Variant};
     use gtkrs::subclass::prelude::*;
@@ -29,7 +21,7 @@ mod imp {
     #[properties(wrapper_type = super::ValueNotifier)]
     pub(super) struct ValueNotifier {
         #[property(get, set)]
-        value: Cell<bool>,
+        value: AtomicBool,
     }
 
     #[glib::object_subclass]
@@ -58,9 +50,9 @@ impl ValueNotifier {
         self.notify_value();
     }
 
-    pub fn bind<'a, G: ToValue + 'static>(&'a self, obj: &'a impl ObjectType, prop: &'a str, get_value: impl (Fn() -> G) + Send + Sync + 'static) -> glib::object::BindingBuilder {
+    pub fn bind<'a, G: ToValue + 'static>(&'a self, obj: &'a impl ObjectType, prop: &'a str, get_value: impl (Fn() -> Option<G>) + Send + Sync + 'static) -> BindingBuilder<'a, 'a, 'a> {
         self.bind_property("value", obj, prop)
-            .transform_to(move |_, _: bool| Some(get_value().to_value()))
+            .transform_to(move |_, _: bool| get_value().map(|g| g.to_value()))
     }
 }
 
@@ -74,7 +66,7 @@ struct WeakState<T> {
     delegate: <ValueNotifier as Downgrade>::Weak,
 }
 
-impl<T: Clone + ToValue + 'static> State<T> {
+impl<T: Clone + ToValue + Send + PartialEq + 'static> State<T> {
     pub fn new(value: T) -> Self {
         Self {
             delegate: ValueNotifier::new(),
@@ -82,19 +74,18 @@ impl<T: Clone + ToValue + 'static> State<T> {
         }
     }
 
-    pub fn get(&self) -> T {
-        self.value.lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone()
-    }
-
     pub fn set(&self, value: T) {
-        {
-            let mut value_ref = self.value.lock()
+        if {
+            let mut guard = self.value.lock()
                 .unwrap_or_else(PoisonError::into_inner);
-            *value_ref = value;
+            let changed = &*guard != &value;
+            if changed {
+                *guard = value;
+            }
+            changed
+        } {
+            self.delegate.notify();
         }
-        self.delegate.notify();
     }
 
     pub fn update(&self, value: impl FnOnce(T) -> T) {
@@ -102,7 +93,7 @@ impl<T: Clone + ToValue + 'static> State<T> {
     }
 
     pub fn map<G>(&self, f: impl Fn(T) -> G + Send + Sync + 'static) -> State<G>
-        where G: Clone + ToValue + 'static
+        where G: Clone + ToValue + Send + PartialEq + 'static
     {
         let clonable_f = Arc::new(f);
         let f = clonable_f.clone();
@@ -117,6 +108,19 @@ impl<T: Clone + ToValue + 'static> State<T> {
             new_state_clone.set(item);
         });
         new_state
+    }
+
+    pub(super) fn bind<'a, G>(
+        &'a self,
+        obj: &'a (impl IsA<Object> + Cleanup),
+        prop: &'a str,
+        f: impl (Fn(T) -> Option<G>) + Send + Sync + 'static
+    ) -> BindingBuilder<'a, 'a, 'a> where G: ToValue + 'static {
+        let arc = self.value.clone();
+        self.delegate.bind(obj.as_ref(), prop, move || {
+            f(arc.lock().unwrap_or_else(PoisonError::into_inner).clone())
+        })
+            .sync_create()
     }
 
     fn downgrade(&self) -> WeakState<T> {
@@ -136,14 +140,13 @@ impl<T> WeakState<T> {
     }
 }
 
-impl<T: ToValue + 'static + Clone + Send> Handler for State<T> {
-    fn handle(&self, obj: &(impl IsA<Object> + Cleanup), prop: &str) {
-        let arc = self.value.clone();
-        self.delegate.bind(obj.as_ref(), prop, move || {
-            arc.lock().unwrap_or_else(PoisonError::into_inner).clone()
-        })
-            .sync_create()
-            .build();
+impl<T: ToValue + 'static + Clone + Send + PartialEq> Handler for State<T> {
+    fn build_binding<'a>(&'a self, obj: &'a (impl IsA<Object> + Cleanup), prop: &'a str) -> BindingBuilder<'a, 'a, 'a> {
+        self.bind(obj, prop, Some)
+    }
+
+    fn connect_notify(&self, f: impl Fn() + Send + Sync + 'static) {
+        self.delegate.connect_value_notify(move |_| { f() });
     }
 }
 
@@ -156,6 +159,14 @@ impl<T> Clone for State<T> {
     }
 }
 
-impl<T: ToValue + 'static + Clone + Send> HandlerOf<T> for State<T> {
+impl<T: ToValue + 'static + Clone + Send + PartialEq> HandlerOf<T> for State<T> {
+    fn get(&self) -> T {
+        self.value.lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+}
 
+impl<T: ToValue + 'static + Clone + Send + PartialEq> HandlerWithType for State<T> {
+    type Type = T;
 }

@@ -16,6 +16,11 @@ fn main() {
 
 fn build_ui(app: &gtkrs::Application) {
     let state = State::new(0);
+    let text = State::new("Hello World!".to_string());
+
+    (&state, &text).use_effect(move |(state, text)| {
+        println!("Count: {}", state);
+    });
 
     let window = ApplicationWindow! {
         application: app,
@@ -26,7 +31,12 @@ fn build_ui(app: &gtkrs::Application) {
             orientation: gtkrs::Orientation::Vertical,
             spacing: 6,
             append: &Label! {
-                #label: &state.clone().map(|n| n.to_string())
+                #label: &(&state, &text).combine(|(state, text)| {
+                    format!("Count: {}, Message: {}", state, text)
+                })
+            },
+            append: &Entry! {
+                #text: &text.bidirectional()
             },
             append: &Button! {
                 label: "+1",
